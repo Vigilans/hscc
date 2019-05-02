@@ -1,6 +1,7 @@
 module Text.Lexer.Regex (
     Regex (..),
-    Position
+    Position,
+    regex2dfa
 ) where
 
 import qualified Text.Lexer.DFA as DFA
@@ -90,3 +91,41 @@ regexFunction re = execState (run re) (RegexFunction M.empty M.empty M.empty M.e
             followpos = M.insert i S.empty $ followpos s,
             leafsymb  = M.insert i n $ leafsymb s
         }
+
+data Regex2DFAState = R2DS {
+    trans   :: [DFA.Transition],
+    states  :: S.Set DFA.State,
+    accepts :: S.Set DFA.State
+}
+
+regex2dfa :: Regex -> DFA.DFA
+regex2dfa reg = let
+    -- Augment regex with '#'
+    aug = Union reg Endmark
+    -- Compute regex functions
+    RegexFunction { firstpos, followpos, leafsymb } = regexFunction aug
+    -- Prepare DFA invariants
+    initState  = firstpos ! aug
+    inputSymbs = [s | Symbol s <- M.elems leafsymb]
+    endMarkPos = head [i | (i, Endmark) <- M.assocs leafsymb]
+    -- Run a queue to generate DFA
+    run :: Q.Seq DFA.State -> State Regex2DFAState DFA.DFA
+    run Q.Empty = gets $ \(R2DS ts ss as) -> DFA.build (ts, initState, as)
+    run (s :<| rest) = do
+        queue <- foldM (\queue a -> do
+            R2DS { trans, states, accepts } <- get
+            let u = S.unions [followpos ! p | p <- S.toList s, leafsymb ! p == Symbol a]
+            -- Add new transition
+            modify $ \r2ds -> r2ds { trans = (s, a, u) : trans }
+            -- Check whether it is a new state
+            if S.notMember u states then do
+                -- Add to total states
+                modify $ \r2ds -> r2ds { states = S.insert u states }
+                -- Check whether it is an accept state
+                when (S.member endMarkPos u) $
+                    modify $ \r2ds -> r2ds { accepts = S.insert u accepts }
+                -- Add new state to queue
+                return (queue :|> u)
+            else return queue) rest inputSymbs
+        run queue
+    in evalState (run $ Q.singleton initState) (R2DS [] S.empty S.empty)
