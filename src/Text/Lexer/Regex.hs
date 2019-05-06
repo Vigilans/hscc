@@ -107,7 +107,7 @@ regex2dfa reg = let
     -- Prepare DFA invariants
     initState  = firstpos ! aug
     inputSymbs = [s | Symbol s <- M.elems leafsymb]
-    endMarkPos = head [i | (i, Endmark) <- M.assocs leafsymb]
+    endmarkPos = head [i | (i, Endmark) <- M.assocs leafsymb]
     -- Run a queue to generate DFA
     run :: Q.Seq DFA.State -> State Regex2DFAState DFA.DFA
     run Q.Empty = gets $ \(R2DS ts ss as) -> DFA.build (ts, initState, as)
@@ -122,7 +122,7 @@ regex2dfa reg = let
                 -- Add to total states
                 modify $ \r2ds -> r2ds { states = S.insert u states }
                 -- Check whether it is an accept state
-                when (S.member endMarkPos u) $
+                when (S.member endmarkPos u) $
                     modify $ \r2ds -> r2ds { accepts = S.insert u accepts }
                 -- Add new state to queue
                 return (queue :|> u)
