@@ -1,7 +1,8 @@
 module Text.Lexer.Regex (
     Regex (..),
     Position,
-    regex2dfa
+    regex2dfa,
+    parseRegex
 ) where
 
 import qualified Text.Lexer.DFA as DFA
@@ -12,6 +13,8 @@ import qualified Data.Sequence as Q -- As queue
 import Data.Map ((!))
 import Data.Sequence (Seq((:<|), (:|>)))
 import Control.Monad.State
+import Text.ParserCombinators.Parsec hiding (State)
+
 
 data Regex = Epsilon
            | Symbol Char
@@ -19,16 +22,35 @@ data Regex = Epsilon
            | Concat Regex Regex
            | Closure Regex
            | Endmark
-           deriving (Eq, Ord, Read)
+           deriving (Eq, Ord, Read, Show)
 
-instance Show Regex where
-    show = run (Left Epsilon) where
-        run _ Epsilon = "ε"
-        run _ Endmark = "#"
-        run _ (Symbol ch) = [ch]
-        run _ (Concat r1 r2) = show r1 ++ show r2
-        run _ (Union  r1 r2) = show r1 ++ "|" ++ show r2
-        run _ (Closure r) = "(" ++ show r ++ ")*"
+-- instance Show Regex where
+--     show = run (Left Epsilon) where
+--         run _ Epsilon = "ε"
+--         run _ Endmark = "#"
+--         run _ (Symbol ch) = [ch]
+--         run _ (Concat r1 r2) = show r1 ++ show r2
+--         run _ (Union  r1 r2) = show r1 ++ "|" ++ show r2
+--         run _ (Closure r) = "(" ++ show r ++ ")*"
+
+read :: String -> Regex
+read s = case parse parseRegex "" s of
+    Left err -> error "no parse"
+    Right re -> re
+
+parseRegex :: Parser Regex
+parseRegex = regex where
+    regex     = union <|> simpleReg
+    union     = Union <$> regex <* char '|' <*> simpleReg
+    simpleReg = concat <|> basicReg
+    concat    = Concat <$> simpleReg  <*> basicReg
+    basicReg  = star <|> elemReg
+    star      = Closure <$> elemReg <* char '*'
+    elemReg   = epsilon <|> symbol
+    group     = between (char '(') (char ')') regex
+    epsilon   = Epsilon <$ char '$'
+    symbol    = Symbol  <$> (noneOf metachars <|> char '\\' *> oneOf metachars)
+    metachars = "|*()"
 
 type Position = Int
 type Positions = S.Set Int
