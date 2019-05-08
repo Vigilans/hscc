@@ -1,9 +1,11 @@
 module Text.Lexer.Regex (
     Regex (..),
-    Position,
     regex2dfa,
+    -- showRegex,
+    readRegex,
     parseRegex
 ) where
+
 
 import qualified Text.Lexer.DFA as DFA
 import qualified Data.Map as M
@@ -14,6 +16,7 @@ import Data.Map ((!))
 import Data.Sequence (Seq((:<|), (:|>)))
 import Control.Monad.State
 import Text.ParserCombinators.Parsec hiding (State)
+import Text.Format
 
 
 data Regex = Epsilon
@@ -24,33 +27,35 @@ data Regex = Epsilon
            | Endmark
            deriving (Eq, Ord, Read, Show)
 
--- instance Show Regex where
---     show = run (Left Epsilon) where
---         run _ Epsilon = "ε"
---         run _ Endmark = "#"
---         run _ (Symbol ch) = [ch]
---         run _ (Concat r1 r2) = show r1 ++ show r2
---         run _ (Union  r1 r2) = show r1 ++ "|" ++ show r2
---         run _ (Closure r) = "(" ++ show r ++ ")*"
+-- showRegex :: Regex -> String
+-- showRegex = run where
+--     run Epsilon = "ε"
+--     run Endmark = "#"
+--     run (Symbol ch) = [ch]
+--     run (Concat r1 r2) = format "{0}{1}" [run r1, run r2]
+--     run (Union  r1 r2) = format "({0}|{1})" [run r1, run r2]
+--     run (Closure r@(Symbol _)) = format "{0}*" [run r]
+--     run (Closure r) = format "({0})*" [run r]
 
-read :: String -> Regex
-read s = case parse parseRegex "" s of
-    Left err -> error "no parse"
+readRegex :: String -> Regex
+readRegex s = case parse parseRegex "" s of
+    Left err -> error $ show err
     Right re -> re
 
 parseRegex :: Parser Regex
 parseRegex = regex where
-    regex     = union <|> simpleReg
-    union     = Union <$> regex <* char '|' <*> simpleReg
-    simpleReg = concat <|> basicReg
-    concat    = Concat <$> simpleReg  <*> basicReg
-    basicReg  = star <|> elemReg
+    regex     = try union  <|> simpleReg
+    union     = simpleReg `chainl1` (Union <$ char '|')
+    simpleReg = try concat <|> basicReg
+    concat    = basicReg  `chainl1` (return Concat)
+    basicReg  = try star   <|> elemReg
     star      = Closure <$> elemReg <* char '*'
-    elemReg   = epsilon <|> symbol
+    elemReg   = try symbol <|> try epsilon <|> group
     group     = between (char '(') (char ')') regex
-    epsilon   = Epsilon <$ char '$'
-    symbol    = Symbol  <$> (noneOf metachars <|> char '\\' *> oneOf metachars)
-    metachars = "|*()"
+    epsilon   = Epsilon <$  char 'ε'
+    symbol    = Symbol  <$> validChar
+    validChar = noneOf metaChars <|> char '\\' *> oneOf metaChars
+    metaChars = "|*()ε"
 
 type Position = Int
 type Positions = S.Set Int
