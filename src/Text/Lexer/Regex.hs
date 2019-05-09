@@ -1,7 +1,7 @@
 module Text.Lexer.Regex (
     Regex (..),
     regex2dfa,
-    -- showRegex,
+    showRegex,
     readRegex,
     parseRegex
 ) where
@@ -16,7 +16,6 @@ import Data.Map ((!))
 import Data.Sequence (Seq((:<|), (:|>)))
 import Control.Monad.State
 import Text.ParserCombinators.Parsec hiding (State)
-import Text.Format
 
 
 data Regex = Epsilon
@@ -27,15 +26,14 @@ data Regex = Epsilon
            | Endmark
            deriving (Eq, Ord, Read, Show)
 
--- showRegex :: Regex -> String
--- showRegex = run where
---     run Epsilon = "ε"
---     run Endmark = "#"
---     run (Symbol ch) = [ch]
---     run (Concat r1 r2) = format "{0}{1}" [run r1, run r2]
---     run (Union  r1 r2) = format "({0}|{1})" [run r1, run r2]
---     run (Closure r@(Symbol _)) = format "{0}*" [run r]
---     run (Closure r) = format "({0})*" [run r]
+showRegex :: Regex -> String
+showRegex = run where
+    run Epsilon = "ε"
+    run Endmark = "#"
+    run (Symbol ch) = [ch]
+    run (Concat r1 r2) = run r1 ++ run r2
+    run (Union  r1 r2) = "(" ++ run r1 ++ "|" ++ run r2 ++ ")"
+    run (Closure r) = "(" ++ run r ++ ")*"
 
 readRegex :: String -> Regex
 readRegex s = case parse parseRegex "" s of
