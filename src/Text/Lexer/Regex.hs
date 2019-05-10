@@ -40,39 +40,36 @@ readRegex s = case parse parseRegex "" s of
     Left err -> error $ show err
     Right re -> re
 
-norm :: Char -> Char
-norm 'n' = '\n'
-norm 't' = '\t'
-norm 'v' = '\v'
-norm 'f' = '\f'
-
 parseRegex :: Parser Regex
 parseRegex = regex where
-    regex     = try union  <|> simpleReg
-    union     = simpleReg `chainl1` (Union <$ char '|')
-    simpleReg = try concat <|> basicReg
-    concat    = basicReg  `chainl1` (return Concat)
-    basicReg  = try star   <|> try plus <|> try question <|> elemReg
-    star      = Closure <$> elemReg <* char '*'
-    plus      = do
+    regex       = try union  <|> simpleReg
+    union       = simpleReg `chainl1` (Union <$ char '|')
+    simpleReg   = try concat <|> basicReg
+    concat      = basicReg  `chainl1` (return Concat)
+    basicReg    = try star   <|> try plus <|> try question <|> elemReg
+    star        = Closure <$> elemReg <* char '*'
+    plus        = do
         r <- elemReg
         char '+'
         return $ Concat r (Closure r)
-    question  = do
+    question    = do
         r <- elemReg
         char '?'
         return $ Union r Epsilon
-    elemReg   = try symbol <|> try epsilon <|> group
-    group     = between (char '(') (char ')') regex
-    epsilon   = Epsilon <$  char 'ε'
-    symbol = try meta <|> try escape <|> Symbol <$> noneOf metaChars
+    elemReg     = try symbol <|> try epsilon <|> try any <|> group
+    group       = between (char '(') (char ')') regex
+    epsilon     = Epsilon <$  char 'ε'
+    any         = do
+        char '.'
+        return $ foldl (\a b -> Concat a b) (Concat (Symbol 'A') (Symbol 'B')) (Symbol <$> (tail $ tail alphabet))
+    symbol      = try meta <|> try escape <|> Symbol <$> noneOf metaChars
     -- try meta first, otherwise \\* will be parsed into Closure (Symbol '\\')
-    meta = do
+    meta        = do
         char '\\'
         r <- oneOf metaChars
         return $ Symbol r
     -- note that in '.l' files, '\t' is actually presented as '\\t'
-    escape = do
+    escape      = do
         char '\\'
         r <- oneOf escapeChars
         return $ Symbol (norm r) where
@@ -80,11 +77,9 @@ parseRegex = regex where
             norm 't' = '\t'
             norm 'v' = '\v'
             norm 'f' = '\f'
-    metaChars = "\\|*()ε"
-    escapeChars = "ntvf"
-    
-    
-    -- alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"#%'()*+,-./:;<=>\?[\\]^{|}_ \n\t\v\f~&"
+    metaChars = "\\|.*+?()ε"
+    escapeChars = "ntvf"    
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"#%'()*+,-./:;<=>?[\\]^{|}_ \n\t\v\f~&"
 
 type Position = Int
 type Positions = S.Set Int
