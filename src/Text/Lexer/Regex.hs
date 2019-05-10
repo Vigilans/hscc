@@ -40,13 +40,13 @@ readRegex s = case parse parseRegex "" s of
     Left err -> error $ show err
     Right re -> re
 
-parseRegex :: Parser Regex
+parseRegex :: GenParser Char state Regex
 parseRegex = regex where
     regex       = try union  <|> simpleReg
     union       = simpleReg `chainl1` (Union <$ char '|')
     simpleReg   = try concat <|> basicReg
     concat      = basicReg  `chainl1` (return Concat)
-    
+
     basicReg    = try star   <|> try plus <|> try question <|> elemReg
     star        = Closure <$> elemReg <* char '*'
     plus        = do
@@ -57,14 +57,14 @@ parseRegex = regex where
         r <- elemReg
         char '?'
         return $ Union r Epsilon
-    
+
     elemReg     = try symbol <|> try epsilon <|> try any <|> try group <|> set
     group       = between (char '(') (char ')') regex
     epsilon     = Epsilon <$  char 'ε'
     any         = do
         char '.'
-        return $ foldl1 (\a b -> Concat a b) (Symbol <$> alphabet)
-    
+        return $ foldl1 (\a b -> Union a b) (Symbol <$> alphabet)
+
     set         = try negSet <|> posSet
     negSet      = do
         string "[^"
@@ -81,7 +81,7 @@ parseRegex = regex where
     range       = do
         l <- symbol
         char '-'
-        r <- symbol  
+        r <- symbol
         return $ [(unpack l)..(unpack r)] where unpack (Symbol c) = c
     symbol      = try meta <|> try escape <|> Symbol <$> noneOf metaChars
     -- try meta first, otherwise \\* will be parsed into Closure (Symbol '\\')
@@ -98,9 +98,9 @@ parseRegex = regex where
             norm 't' = '\t'
             norm 'v' = '\v'
             norm 'f' = '\f'
-    
+
     metaChars = "\\|.*+?()[^]ε"
-    escapeChars = "ntvf"    
+    escapeChars = "ntvf"
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%',/:;<=>{}&_ ?()[].^*+-~|\n\t\v\f\"\\"
 
 type Position = Int

@@ -68,7 +68,6 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     repState :: State -> State
     repState s = fromJust $ S.findMin <$> L.find (S.member s) finalPartition
 
-
 makeIndex :: DFA -> DFA -- Starts from 1
 makeIndex dfa@DFA { states } = mapStates (\s -> s { code = S.singleton (S.findIndex s states + 1) }) dfa
 

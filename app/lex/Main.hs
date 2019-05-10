@@ -1,4 +1,11 @@
 module Main where
 
-main :: IO String
-main = return "This is a lexer"
+import System.IO
+
+main :: IO ()
+main = do
+    inh <- openFile "./test.l" ReadMode
+    inpStr <- hGetContents inh
+    putStr inpStr
+    hClose inh
+    return ()
