@@ -101,7 +101,7 @@ parseRegex = regex where
     
     metaChars = "\\|.*+?()[^]ε"
     escapeChars = "ntvf"    
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"#%'()*+,-./:;<=>?[\\]^{|}_ \n\t\v\f~&"
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%',/:;<=>{}&_ ?()[].^*+-~|\n\t\v\f\"\\"
 
 type Position = Int
 type Positions = S.Set Int
