@@ -46,6 +46,7 @@ parseRegex = regex where
     union       = simpleReg `chainl1` (Union <$ char '|')
     simpleReg   = try concat <|> basicReg
     concat      = basicReg  `chainl1` (return Concat)
+    
     basicReg    = try star   <|> try plus <|> try question <|> elemReg
     star        = Closure <$> elemReg <* char '*'
     plus        = do
@@ -56,12 +57,32 @@ parseRegex = regex where
         r <- elemReg
         char '?'
         return $ Union r Epsilon
-    elemReg     = try symbol <|> try epsilon <|> try any <|> group
+    
+    elemReg     = try symbol <|> try epsilon <|> try any <|> try group <|> set
     group       = between (char '(') (char ')') regex
     epsilon     = Epsilon <$  char 'ε'
     any         = do
         char '.'
-        return $ foldl (\a b -> Concat a b) (Concat (Symbol 'A') (Symbol 'B')) (Symbol <$> (tail $ tail alphabet))
+        return $ foldl1 (\a b -> Concat a b) (Symbol <$> alphabet)
+    
+    set         = try negSet <|> posSet
+    negSet      = do
+        string "[^"
+        alphas <- setItems
+        char ']'
+        return $ foldl1 (\a b -> Union a b) (Symbol <$> [ x | x <- alphabet, not $ x `elem` alphas])
+    posSet      = do
+        char '['
+        alphas <- setItems
+        char ']'
+        return $ foldl1 (\a b -> Union a b) (Symbol <$> alphas)
+    setItems    = setItem `chainl1` (return (++))
+    setItem     = try range <|> unpack <$> symbol where unpack (Symbol c) = [c]
+    range       = do
+        l <- symbol
+        char '-'
+        r <- symbol  
+        return $ [(unpack l)..(unpack r)] where unpack (Symbol c) = c
     symbol      = try meta <|> try escape <|> Symbol <$> noneOf metaChars
     -- try meta first, otherwise \\* will be parsed into Closure (Symbol '\\')
     meta        = do
@@ -77,7 +98,8 @@ parseRegex = regex where
             norm 't' = '\t'
             norm 'v' = '\v'
             norm 'f' = '\f'
-    metaChars = "\\|.*+?()ε"
+    
+    metaChars = "\\|.*+?()[^]ε"
     escapeChars = "ntvf"    
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"#%'()*+,-./:;<=>?[\\]^{|}_ \n\t\v\f~&"
 
