@@ -2,13 +2,17 @@ module Text.Lexer.DFA where
 
 import qualified Data.List as L
 import qualified Data.Map as M
-import qualified Data.Set.Monad as S
+import qualified Data.Set as S
 import qualified Data.Array as A
 import Data.Maybe
-import Data.Map ((!))
-import Data.Set.Monad ((\\))
+import Data.Map ((!), (!?))
+import Data.Set ((\\))
 
-type State      = S.Set Int
+data State = Empty | State {
+    code :: S.Set Int,
+    tags :: [String]
+} deriving (Eq, Ord, Read, Show)
+
 type Condition  = Char
 type Transition = (State, Condition, State)
 
@@ -18,10 +22,10 @@ data DFA = DFA {
     initialState :: State,
     acceptStates :: S.Set State,
     transTable   :: M.Map (State, Condition) State
-}
+} deriving (Read, Show)
 
 trans :: DFA -> State -> Condition -> State
-trans dfa s c = transTable dfa ! (s, c)
+trans dfa s c = fromMaybe Empty $ transTable dfa !? (s, c)
 
 build :: ([Transition], State, S.Set State) -> DFA
 build (transitions, initialState, acceptStates) = let
@@ -39,17 +43,17 @@ partition :: DFA -> Partition -> Partition
 partition dfa = run [] where
     run front [] = front
     run front (group:back) = run (front ++ subgroups) back where
-        mapper s = trans dfa s <$> alphabet dfa
+        mapper s = S.map (trans dfa s) (alphabet dfa)
         folder s = M.insertWith S.union (mapper s) (S.singleton s)
         subgroups = M.elems $ S.foldr folder M.empty group
 
 mapStates :: (State -> State) -> DFA -> DFA
-mapStates f DFA { alphabet, states, initialState, acceptStates, transTable } = let
+mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
     mapAlphabet :: State -> M.Map (State, Condition) State
-    mapAlphabet s = M.fromList [((s, c), f $ transTable ! (s, c)) | c <- S.toList alphabet]
+    mapAlphabet s = M.fromList [((s, c), f $ trans dfa s c) | c <- S.toList alphabet]
     initialState = f initialState
-    acceptStates = f <$> acceptStates
-    states       = f <$> states
+    acceptStates = S.map f acceptStates
+    states       = S.map f states
     transTable   = S.foldr (M.union . mapAlphabet) M.empty states
     in DFA { alphabet, states, initialState, acceptStates, transTable }
 
@@ -63,3 +67,33 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     -- Get representative state (it must exists)
     repState :: State -> State
     repState s = fromJust $ S.findMin <$> L.find (S.member s) finalPartition
+
+
+makeIndex :: DFA -> DFA -- Starts from 1
+makeIndex dfa@DFA { states } = mapStates (\s -> s { code = S.singleton (S.findIndex s states + 1) }) dfa
+
+unionState :: State -> State -> State
+unionState = run where
+    run Empty Empty = Empty
+    run a     Empty = run a (State (S.singleton 0) [])
+    run Empty b     = run (State (S.singleton 0) []) b
+    run a     b     = State (code a `S.union` code b) (tags a ++ tags b)
+
+union :: DFA -> DFA -> DFA
+union a b = let
+    a = makeIndex a
+    b = makeIndex b
+    transitions = [ (from, c, to) |
+        c <- S.toList (alphabet a `S.union` alphabet b),
+        x <- Empty : S.toList (states a),
+        y <- Empty : S.toList (states b),
+        let from = unionState x y; to = unionState (trans a x c) (trans b y c),
+        to /= Empty
+        ]
+    initial = unionState (initialState a) (initialState b)
+    accepts = S.fromList [ unionState x y |
+        x <- Empty : S.toList (states a),
+        y <- Empty : S.toList (states b),
+        S.member x (acceptStates a) || S.member y (acceptStates b)
+        ]
+    in makeIndex $ build (transitions, initial, accepts)
