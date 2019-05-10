@@ -2,11 +2,11 @@ module Text.Lexer.DFA where
 
 import qualified Data.List as L
 import qualified Data.Map as M
-import qualified Data.Set.Monad as S
+import qualified Data.Set as S
 import qualified Data.Array as A
 import Data.Maybe
 import Data.Map ((!))
-import Data.Set.Monad ((\\))
+import Data.Set ((\\))
 
 type State      = S.Set Int
 type Condition  = Char
@@ -39,17 +39,17 @@ partition :: DFA -> Partition -> Partition
 partition dfa = run [] where
     run front [] = front
     run front (group:back) = run (front ++ subgroups) back where
-        mapper s = trans dfa s <$> alphabet dfa
+        mapper s = S.map (trans dfa s) (alphabet dfa)
         folder s = M.insertWith S.union (mapper s) (S.singleton s)
         subgroups = M.elems $ S.foldr folder M.empty group
 
 mapStates :: (State -> State) -> DFA -> DFA
-mapStates f DFA { alphabet, states, initialState, acceptStates, transTable } = let
+mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
     mapAlphabet :: State -> M.Map (State, Condition) State
-    mapAlphabet s = M.fromList [((s, c), f $ transTable ! (s, c)) | c <- S.toList alphabet]
+    mapAlphabet s = M.fromList [((s, c), f $ trans dfa s c) | c <- S.toList alphabet]
     initialState = f initialState
-    acceptStates = f <$> acceptStates
-    states       = f <$> states
+    acceptStates = S.map f acceptStates
+    states       = S.map f states
     transTable   = S.foldr (M.union . mapAlphabet) M.empty states
     in DFA { alphabet, states, initialState, acceptStates, transTable }
 

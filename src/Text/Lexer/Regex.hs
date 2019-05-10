@@ -8,9 +8,9 @@ module Text.Lexer.Regex (
 
 
 import qualified Text.Lexer.DFA as DFA
-import qualified Data.Map as M
 import qualified Data.List as L
-import qualified Data.Set.Monad as S
+import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.Sequence as Q -- As queue
 import Data.Map ((!))
 import Data.Sequence (Seq((:<|), (:|>)))
