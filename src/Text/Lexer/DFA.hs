@@ -5,10 +5,14 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Array as A
 import Data.Maybe
-import Data.Map ((!))
+import Data.Map ((!), (!?))
 import Data.Set ((\\))
 
-type State      = S.Set Int
+data State = Empty | State {
+    code :: S.Set Int,
+    tags :: [String]
+} deriving (Eq, Ord, Read, Show)
+
 type Condition  = Char
 type Transition = (State, Condition, State)
 
@@ -18,10 +22,10 @@ data DFA = DFA {
     initialState :: State,
     acceptStates :: S.Set State,
     transTable   :: M.Map (State, Condition) State
-}
+} deriving (Read, Show)
 
 trans :: DFA -> State -> Condition -> State
-trans dfa s c = transTable dfa ! (s, c)
+trans dfa s c = fromMaybe Empty $ transTable dfa !? (s, c)
 
 build :: ([Transition], State, S.Set State) -> DFA
 build (transitions, initialState, acceptStates) = let

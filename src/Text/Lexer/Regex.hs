@@ -123,14 +123,14 @@ data Regex2DFAState = R2DS {
     accepts :: S.Set DFA.State
 }
 
-regex2dfa :: Regex -> DFA.DFA
-regex2dfa reg = let
+regex2dfa :: Regex -> String -> DFA.DFA
+regex2dfa reg tag = let
     -- Augment regex with '#'
     aug = Union reg Endmark
     -- Compute regex functions
     RegexFunction { firstpos, followpos, leafsymb } = regexFunction aug
     -- Prepare DFA invariants
-    initState  = firstpos ! aug
+    initState  = DFA.State (firstpos ! aug) [tag]
     inputSymbs = [s | Symbol s <- M.elems leafsymb]
     endmarkPos = head [i | (i, Endmark) <- M.assocs leafsymb]
     -- Run a queue to generate DFA
@@ -139,7 +139,9 @@ regex2dfa reg = let
     run (s :<| rest) = do
         queue <- foldM (\queue a -> do
             R2DS { trans, states, accepts } <- get
-            let u = S.unions [followpos ! p | p <- S.toList s, leafsymb ! p == Symbol a]
+            let sCode = S.toList $ DFA.code s
+                uCode = S.unions [followpos ! p | p <- sCode, leafsymb ! p == Symbol a]
+                u = DFA.State uCode [tag]
             -- Add new transition
             modify $ \r2ds -> r2ds { trans = (s, a, u) : trans }
             -- Check whether it is a new state
@@ -147,7 +149,7 @@ regex2dfa reg = let
                 -- Add to total states
                 modify $ \r2ds -> r2ds { states = S.insert u states }
                 -- Check whether it is an accept state
-                when (S.member endmarkPos u) $
+                when (S.member endmarkPos uCode) $
                     modify $ \r2ds -> r2ds { accepts = S.insert u accepts }
                 -- Add new state to queue
                 return (queue :|> u)
