@@ -3,16 +3,16 @@ module Text.Lexer.DFA where
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Array as A
 import Data.Maybe
 import Data.Map ((!), (!?))
 import Data.Set ((\\))
 
 data State = Empty | State {
     code :: S.Set Int,
-    tags :: [String]
+    tags :: [Tag]
 } deriving (Eq, Ord, Read, Show)
 
+type Tag = String
 type Condition  = Char
 type Transition = (State, Condition, State)
 
@@ -27,6 +27,9 @@ data DFA = DFA {
 trans :: DFA -> State -> Condition -> State
 trans dfa s c = fromMaybe Empty $ transTable dfa !? (s, c)
 
+accept :: DFA -> State -> Bool
+accept dfa s = S.member s $ acceptStates dfa
+
 build :: ([Transition], State, S.Set State) -> DFA
 build (transitions, initialState, acceptStates) = let
     (alphabet, states, transTable) = foldl (\(conds, states, table) (from, cond, to) -> (
@@ -35,6 +38,13 @@ build (transitions, initialState, acceptStates) = let
             M.insert (from, cond) to table
         )) (S.empty, S.empty, M.empty) transitions
     in DFA { alphabet, states, initialState, acceptStates, transTable }
+
+run :: DFA -> [Condition] -> [Tag]
+run dfa input = go (initialState dfa) input [] where
+    go _ [] ts = ts
+    go x (c:cs) ts = case trans dfa x c of
+        Empty -> ts
+        y -> go y cs (if accept dfa y then tags y else ts)
 
 type Group = S.Set State
 type Partition = [Group]
@@ -95,4 +105,4 @@ union a b = let
         y <- Empty : S.toList (states b),
         S.member x (acceptStates a) || S.member y (acceptStates b)
         ]
-    in makeIndex $ build (transitions, initial, accepts)
+    in build (transitions, initial, accepts)

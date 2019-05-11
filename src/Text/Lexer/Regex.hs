@@ -171,7 +171,7 @@ data Regex2DFAState = R2DS {
     accepts :: S.Set DFA.State
 }
 
-regex2dfa :: Regex -> String -> DFA.DFA
+regex2dfa :: Regex -> DFA.Tag -> DFA.DFA
 regex2dfa reg tag = let
     -- Augment regex with '#'
     aug = Union reg Endmark
