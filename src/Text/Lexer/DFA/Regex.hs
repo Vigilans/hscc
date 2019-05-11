@@ -4,7 +4,6 @@ module Text.Lexer.DFA.Regex (
 
 import Text.Lexer.Regex
 import qualified Text.Lexer.DFA as DFA
-import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Sequence as Q -- As queue
@@ -74,7 +73,7 @@ regexFunction re = execState (run re) (RegexFunction M.empty M.empty M.empty M.e
             leafsymb  = M.insert i n leafsymb
         }
 
-data Regex2DFAState = R2DS {
+data RegexToDFAState = R2DS {
     trans   :: [DFA.Transition],
     states  :: S.Set DFA.State,
     accepts :: S.Set DFA.State
@@ -86,19 +85,21 @@ regex2dfa reg tag = let
     aug = Union reg Endmark
     -- Compute regex functions
     RegexFunction { firstpos, followpos, leafsymb } = regexFunction aug
-    -- Prepare DFA invariants
-    initState  = DFA.State (firstpos ! aug) [tag]
+    -- Prepare DFA invariants and utility functions
     inputSymbs = [s | Symbol s <- M.elems leafsymb]
     endmarkPos = head [i | (i, Endmark) <- M.assocs leafsymb]
+    isAccept   = S.member endmarkPos
+    newState c = DFA.State c [tag | isAccept c]
+    initState  = newState (firstpos ! aug)
     -- Run a queue to generate DFA
-    run :: Q.Seq DFA.State -> State Regex2DFAState DFA.DFA
+    run :: Q.Seq DFA.State -> State RegexToDFAState DFA.DFA
     run Q.Empty = gets $ \(R2DS ts ss as) -> DFA.build (ts, initState, as)
     run (s :<| rest) = do
         queue <- foldM (\queue a -> do
             R2DS { trans, states, accepts } <- get
-            let sCode = S.toList $ DFA.code s
+            let sCode = S.toList (DFA.code s)
                 uCode = S.unions [followpos ! p | p <- sCode, leafsymb ! p == Symbol a]
-                u = DFA.State uCode [tag]
+                u = newState uCode
             -- Add new transition
             modify $ \r2ds -> r2ds { trans = (s, a, u) : trans }
             -- Check whether it is a new state
@@ -106,7 +107,7 @@ regex2dfa reg tag = let
                 -- Add to total states
                 modify $ \r2ds -> r2ds { states = S.insert u states }
                 -- Check whether it is an accept state
-                when (S.member endmarkPos uCode) $
+                when (isAccept uCode) $
                     modify $ \r2ds -> r2ds { accepts = S.insert u accepts }
                 -- Add new state to queue
                 return (queue :|> u)
