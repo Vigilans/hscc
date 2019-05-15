@@ -24,12 +24,12 @@ showRegex = run where
     run (Closure r) = "(" ++ run r ++ ")*"
 
 readRegex :: String -> Regex
-readRegex s = case parse parseRegex "" s of
+readRegex s = case parse (parseRegex M.empty) "" s of
     Left err -> error $ show err
     Right re -> re
 
-parseRegex :: GenParser Char state Regex
-parseRegex = regex where
+parseRegex :: M.Map String Regex -> GenParser Char state Regex
+parseRegex symbolTable = regex where
     regex       = try union  <|> simpleReg
     union       = simpleReg `chainl1` (Union <$ char '|')
     simpleReg   = try concat <|> basicReg
