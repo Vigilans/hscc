@@ -30,6 +30,9 @@ trans dfa s c = fromMaybe Empty $ transTable dfa !? (s, c)
 accept :: DFA -> State -> Bool
 accept dfa s = S.member s $ acceptStates dfa
 
+empty :: DFA
+empty = DFA S.empty S.empty Empty S.empty M.empty
+
 build :: ([Transition], State, S.Set State) -> DFA
 build (transitions, initialState, acceptStates) = let
     (alphabet, states, transTable) = foldl (\(conds, states, table) (from, cond, to) -> (
@@ -106,3 +109,6 @@ union a b = let
         S.member x (acceptStates a) || S.member y (acceptStates b)
         ]
     in build (transitions, initial, accepts)
+
+unions :: [DFA] -> DFA
+unions = foldl union empty
