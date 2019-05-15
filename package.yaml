@@ -26,8 +26,6 @@ dependencies:
 - multimap
 - array
 - set-monad
-- regex-base
-- regex-posix
 
 default-extensions:
 - ViewPatterns
