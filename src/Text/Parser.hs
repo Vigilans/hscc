@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Text.ParserCombinators.Parsec as P
 import Control.Monad
+-- import Text.Regex.Posix
 
 data Terminal = Terminal String | Epsilon | Eof deriving (Eq, Ord, Show)
 data NonTerminal = StartRule | NonTerminal String deriving (Eq, Ord, Show)
