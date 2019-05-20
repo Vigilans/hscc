@@ -86,3 +86,11 @@ spec = do
             mapStates id dfa `shouldBe` dfa
         it "should be empty when mapped by const Empty" $
             mapStates (const Empty) dfa `shouldBe` empty
+        it "should stay the same when applied on empty dfa" $
+            mapStates (\s@State {code} -> s { code = S.insert (-1) code }) empty `shouldBe` empty
+
+    describe "DFA Making Index" $ do
+        it "all states' code should be ascending indices from 1" $
+            [code s | s <- S.toList . states $ makeIndex dfa] `shouldBe` S.singleton <$> [1..5]
+        it "should stay the same when applied on empty dfa" $
+            makeIndex empty `shouldBe` empty

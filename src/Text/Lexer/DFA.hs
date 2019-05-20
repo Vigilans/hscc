@@ -62,11 +62,12 @@ partition dfa = run [] where
 
 mapStates :: (State -> State) -> DFA -> DFA
 mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
+    f' s = if s /= Empty then f s else Empty
     mapAlphabet :: State -> M.Map (State, Condition) State
-    mapAlphabet s = M.fromList [((s, c), f $ trans dfa s c) | c <- S.toList alphabet]
-    initialState' = f initialState
-    acceptStates' = S.map f acceptStates \\ S.singleton Empty
-    states'       = S.map f states \\ S.singleton Empty
+    mapAlphabet s = M.fromList [((s, c), f' $ trans dfa s c) | c <- S.toList alphabet]
+    initialState' = f' initialState
+    acceptStates' = S.map f' acceptStates \\ S.singleton Empty
+    states'       = S.map f' states \\ S.singleton Empty
     transTable'   = S.foldr (M.union . mapAlphabet) M.empty states'
     alphabet'     = S.map snd $ M.keysSet transTable'
     in DFA alphabet' states' initialState' acceptStates' transTable'
