@@ -72,8 +72,8 @@ spec = do
             trans dfa Empty 'a' `shouldBe` Empty
 
     describe "DFA Running (a|b)*abb" $ do
-        it "should accept E" $
-            accept dfa sE `shouldBe` True
+        it "should only accept E" $
+            accept dfa <$> [sA, sB, sC, sD, sE] `shouldBe` [False, False, False, False, True]
         it "should accept \"abaabb\"" $
             run dfa "abaabb" `shouldBe` ["test"]
         it "should not accept \"abaab\"" $
