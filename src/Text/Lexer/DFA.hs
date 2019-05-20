@@ -22,7 +22,7 @@ data DFA = DFA {
     initialState :: State,
     acceptStates :: S.Set State,
     transTable   :: M.Map (State, Condition) State
-} deriving (Read, Show)
+} deriving (Eq, Read, Show)
 
 trans :: DFA -> State -> Condition -> State
 trans dfa s c = fromMaybe Empty $ transTable dfa !? (s, c)
