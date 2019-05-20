@@ -38,8 +38,8 @@ regexFunction re = execState (run re) (RegexFunction M.empty M.empty M.empty M.e
         run c2
         modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
             nullable  = M.insert n ((nullable ! c1) || (nullable ! c2)) nullable,
-            firstpos  = M.insert n ((firstpos ! c1) `S.union` (firstpos ! c2)) firstpos,
-            lastpos   = M.insert n ((lastpos  ! c1) `S.union` (lastpos  ! c2)) lastpos,
+            firstpos  = M.insert n ((firstpos ! c1) <> (firstpos ! c2)) firstpos,
+            lastpos   = M.insert n ((lastpos  ! c1) <> (lastpos  ! c2)) lastpos,
             followpos = followpos,
             leafsymb  = leafsymb
         }
@@ -48,8 +48,8 @@ regexFunction re = execState (run re) (RegexFunction M.empty M.empty M.empty M.e
         run c2
         modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
             nullable  = M.insert n ((nullable ! c1) && (nullable ! c2)) nullable,
-            firstpos  = M.insert n ((firstpos ! c1) `S.union` (if nullable ! c1 then firstpos ! c2 else S.empty)) firstpos,
-            lastpos   = M.insert n ((lastpos  ! c2) `S.union` (if nullable ! c2 then lastpos  ! c1 else S.empty)) lastpos,
+            firstpos  = M.insert n ((firstpos ! c1) <> (if nullable ! c1 then firstpos ! c2 else S.empty)) firstpos,
+            lastpos   = M.insert n ((lastpos  ! c2) <> (if nullable ! c2 then lastpos  ! c1 else S.empty)) lastpos,
             followpos = S.foldr (M.adjust $ S.union (firstpos ! c2)) followpos (lastpos ! c1),
             leafsymb  = leafsymb
         }

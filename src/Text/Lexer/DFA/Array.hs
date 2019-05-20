@@ -36,7 +36,7 @@ accept dfa s = tags dfa s /= []
 
 build :: DFA.DFA -> ArrayDFA
 build dfa' = let
-    dfa@DFA.DFA { DFA.alphabet, DFA.states, DFA.initialState } = DFA.makeIndex dfa'
+    dfa@DFA.DFA { DFA.alphabet, DFA.states, DFA.initialState } = DFA.makeIndex dfa' 1 -- index starts from 1
     -- State in ArrayDFA is the index code of the origin state
     initState = mapState initialState
     -- Encoder maps a char input to a reduced condition space (0 represents invalid input)

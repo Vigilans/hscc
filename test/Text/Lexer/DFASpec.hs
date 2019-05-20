@@ -90,7 +90,25 @@ spec = do
             mapStates (\s@State {code} -> s { code = S.insert (-1) code }) empty `shouldBe` empty
 
     describe "DFA Making Index" $ do
-        it "all states' code should be ascending indices from 1" $
-            [code s | s <- S.toList . states $ makeIndex dfa] `shouldBe` S.singleton <$> [1..5]
+        it "all states' code should be ascending indices from offset" $
+            [code s | s <- S.toList . states $ makeIndex dfa 1] `shouldBe` S.singleton <$> [1..5]
         it "should stay the same when applied on empty dfa" $
-            makeIndex empty `shouldBe` empty
+            makeIndex empty 0 `shouldBe` empty
+
+    describe "DFA Union" $ do
+        it "should stay the same when union with Empty state" $
+            S.map (Empty <>) allStates `shouldBe` allStates
+        it "A <> X -> State [1, 2, 3, 4] [\"test\", \"union\"]" $
+            sA <> sX `shouldBe` stateT [1, 2, 3, 4] ["test", "union"]
+        it "B <> Y -> State [1, 2, 3, 4] [\"test\"]" $
+            sB <> sY `shouldBe` stateT [1, 2, 3, 4] ["test"]
+        it "A <> Z -> State [1, 2, 3, 4, 5, 6] [\"test\", \"union\", \"more\"]" $
+            sA <> sZ `shouldBe` stateT [1, 2, 3, 4, 5, 6] ["test", "union", "more"]
+
+-- Stuff for DFA union
+stateT :: [Int] -> [String] -> State
+stateT code tags = State { code = S.fromList code, tags }
+
+sX = stateT [2, 3, 4] ["union"]
+sY = stateT [1, 2, 3] []
+sZ = stateT [4, 5, 6] ["union", "more"]

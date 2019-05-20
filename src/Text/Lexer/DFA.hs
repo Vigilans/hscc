@@ -12,6 +12,11 @@ data State = Empty | State {
     tags :: [Tag]
 } deriving (Eq, Ord, Read, Show)
 
+instance Semigroup State where
+    Empty <> b = b
+    a <> Empty = a
+    a <> b = State (code a <> code b) (tags a <> tags b)
+
 type Tag = String
 type Condition  = Char
 type Transition = (State, Condition, State)
@@ -83,29 +88,22 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     repState :: State -> State
     repState s = fromJust $ S.findMin <$> L.find (S.member s) finalPartition
 
-makeIndex :: DFA -> DFA -- Starts from 1
-makeIndex dfa@DFA { states } = mapStates (\s -> s { code = S.singleton (S.findIndex s states + 1) }) dfa
-
-unionState :: State -> State -> State
-unionState = run where
-    run Empty Empty = Empty
-    run a     Empty = run a (State (S.singleton 0) [])
-    run Empty b     = run (State (S.singleton 0) []) b
-    run a     b     = State (code a `S.union` code b) (tags a ++ tags b)
+makeIndex :: DFA -> Int -> DFA
+makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (S.findIndex s (states dfa) + offset) }) dfa
 
 union :: DFA -> DFA -> DFA
 union a b = let
-    a = makeIndex a
-    b = makeIndex b
+    a = makeIndex a 0
+    b = makeIndex b (S.size $ states a)
     transitions = [ (from, c, to) |
-        c <- S.toList (alphabet a `S.union` alphabet b),
+        c <- S.toList (alphabet a <> alphabet b),
         x <- Empty : S.toList (states a),
         y <- Empty : S.toList (states b),
-        let from = unionState x y; to = unionState (trans a x c) (trans b y c),
+        let from = x <> y; to = trans a x c <> trans b y c,
         to /= Empty
         ]
-    initial = unionState (initialState a) (initialState b)
-    accepts = S.fromList [ unionState x y |
+    initial = initialState a <> initialState b
+    accepts = S.fromList [ x <> y |
         x <- Empty : S.toList (states a),
         y <- Empty : S.toList (states b),
         S.member x (acceptStates a) || S.member y (acceptStates b)
