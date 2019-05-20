@@ -80,3 +80,9 @@ spec = do
             run dfa "abaab" `shouldBe` []
         it "should accept \"abbaab\"" $
             run dfa "abbaab" `shouldBe` ["test"]
+
+    describe "DFA Mapping States" $ do
+        it "should stay the same when mapped by id" $
+            mapStates id dfa `shouldBe` dfa
+        it "should be empty when mapped by const Empty" $
+            mapStates (const Empty) dfa `shouldBe` empty

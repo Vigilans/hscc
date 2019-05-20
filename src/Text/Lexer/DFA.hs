@@ -64,11 +64,12 @@ mapStates :: (State -> State) -> DFA -> DFA
 mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
     mapAlphabet :: State -> M.Map (State, Condition) State
     mapAlphabet s = M.fromList [((s, c), f $ trans dfa s c) | c <- S.toList alphabet]
-    initialState = f initialState
-    acceptStates = S.map f acceptStates
-    states       = S.map f states
-    transTable   = S.foldr (M.union . mapAlphabet) M.empty states
-    in DFA { alphabet, states, initialState, acceptStates, transTable }
+    initialState' = f initialState
+    acceptStates' = S.map f acceptStates \\ S.singleton Empty
+    states'       = S.map f states \\ S.singleton Empty
+    transTable'   = S.foldr (M.union . mapAlphabet) M.empty states'
+    alphabet'     = S.map snd $ M.keysSet transTable'
+    in DFA alphabet' states' initialState' acceptStates' transTable'
 
 minimize :: DFA -> DFA
 minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where

@@ -23,6 +23,7 @@ dependencies:
 - containers
 - mtl
 - hspec
+- QuickCheck
 - parsec
 - multimap
 - array
