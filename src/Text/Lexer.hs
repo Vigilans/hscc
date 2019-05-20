@@ -79,6 +79,7 @@ stripR x = reverse . stripL x . reverse
 
 strip :: String -> String -> String
 strip x = stripL x . stripR x
--- run = case runParser parseLexer (Lexer "blabla" M.empty M.empty "lablab") "sdfas" input of
---     Left err -> error $ show err
---     Right lexer -> lexer
+
+runLexer = case runParser parseLexer (Lexer {}) "" lexFileInput of
+    Left err -> error $ show err
+    Right lexer -> lexer

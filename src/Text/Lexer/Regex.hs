@@ -52,7 +52,8 @@ parseRegex symbolTable = regex where
         name  <- manyTill anyChar (char '}')
         return $ unpack (M.lookup name symbolTable) where
             unpack (Just regex) = regex
-            unpack Nothing = Epsilon
+            -- TODO: should raise error here
+            -- unpack Nothing = Epsilon
     group       = between (char '(') (char ')') regex
     epsilon     = Epsilon <$  char 'ε'
     any         = do
