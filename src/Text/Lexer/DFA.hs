@@ -57,11 +57,15 @@ build (transitions, initialState, acceptStates) = let
     in DFA { alphabet, states, initialState, acceptStates, transTable }
 
 run :: DFA -> [Condition] -> [Tag]
-run dfa input = go (initialState dfa) input [] where
+run dfa@DFA { initialState } input = go initialState input initTags where
+    initTags = if accept dfa initialState then tags initialState else []
     go _ [] ts = ts
     go x (c:cs) ts = case trans dfa x c of
         Empty -> ts
         y -> go y cs (if accept dfa y then tags y else ts)
+
+test :: DFA -> [Condition] -> Bool
+test dfa = accept dfa . foldl (trans dfa) (initialState dfa)
 
 type Group = S.Set State
 type Partition = [Group]

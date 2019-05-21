@@ -113,6 +113,32 @@ spec = do
         it "A <> Z -> State [1, 2, 3, 4, 5, 6] [\"test\", \"union\", \"more\"]" $
             sA <> sZ `shouldBe` state [1, 2, 3, 4, 5, 6] ["test", "union", "more"]
 
+    describe "DFA Union - Equal to Hard-Code" $ do
+        it "Equality: initialState" $
+            initialState (dfa <> dfa') `shouldBe` initialState unionDFA
+        it "Equality: acceptStates" $
+            acceptStates (dfa <> dfa') `shouldBe` acceptStates unionDFA
+        it "Equality: alphabet" $
+            alphabet (dfa <> dfa') `shouldBe` alphabet unionDFA
+        it "Equality: states" $
+            states (dfa <> dfa') `shouldBe` states unionDFA
+        it "Equality: transTable" $
+            transTable (dfa <> dfa') `shouldBe` transTable unionDFA
+        it "Equality: ensembled DFA" $
+            dfa <> dfa' `shouldBe` unionDFA
+
+    describe "DFA Union - ((a|b)*abb)|(1|(ε|(a|11)a)((a|11)a)*(1|ε|(a|11)a)|ε|(a|11)a)" $ do
+        it "should accept \"abaabb\" to [\"test\"]" $
+            run unionDFA "abaabb" `shouldBe` ["test"]
+        it "should accept \"aaaa\" to [\"test\", \"union\"]" $
+            run unionDFA "aaaa" `shouldBe` ["test", "union"]
+        it "should accept \"11aaa1\" to [\"union\", \"more\"]" $
+            run unionDFA "11aaa1" `shouldBe` ["union", "more"]
+        it "should not accept \"aaaaa\"" $
+            test unionDFA "aaaaa" `shouldBe` False
+        it "should accept \"\" to [\"test\", \"union\"]" $
+            run unionDFA "" `shouldBe` ["test", "union"]
+
 {- ------- Stuff for DFA makeIndex ------- -}
 sA' = sA { code = S.singleton 0 };
 sB' = sB { code = S.singleton 1 };
@@ -131,5 +157,77 @@ indexDFA = DFA {
         (sC', 'a', sB'), (sC', 'b', sC'),
         (sD', 'a', sB'), (sD', 'b', sE'),
         (sE', 'a', sB'), (sE', 'b', sC')
+    ]
+}
+
+{- ------- Stuff for DFA union ------- -}
+sX = state [2, 3, 4] ["union"]
+sY = state [1, 2, 3] []
+sZ = state [4, 5, 6] ["union", "more"]
+
+-- Lacks two transition whose to_state is Empty
+tXa = (sX, 'a', sY)
+tX1 = (sX, '1', sZ)
+tYa = (sY, 'a', sX)
+tZ1 = (sZ, '1', sY)
+
+-- Stands for regex
+dfa' = build (S.fromList [tXa, tX1, tYa, tZ1], sX, S.fromList [sX, sZ])
+
+-- Hard coded invariants
+uAX = state [0, 6] ["test", "union"]
+uAY = state [0, 5] ["test"]
+uAZ = state [0, 7] ["test", "union", "more"]
+uBX = state [1, 6] ["test", "union"]
+uBY = state [1, 5] ["test"]
+uBZ = state [1, 7] ["test", "union", "more"]
+uCX = state [2, 6] ["test", "union"]
+uCY = state [2, 5] ["test"]
+uCZ = state [2, 7] ["test", "union", "more"]
+uDX = state [3, 6] ["test", "union"]
+uDY = state [3, 5] ["test"]
+uDZ = state [3, 7] ["test", "union", "more"]
+uEX = state [4, 6] ["test", "union"]
+uEY = state [4, 5] ["test"]
+uEZ = state [4, 7] ["test", "union", "more"]
+uA0 = sA'; uB0 = sB'; uC0 = sC'; uD0 = sD'; uE0 = sE';
+u0X = sX { code = S.singleton 6 };
+u0Y = sY { code = S.singleton 5 };
+u0Z = sZ { code = S.singleton 7 };
+{- u00 = Empty -} -- Not used
+
+-- We could see that some states will never reached here.
+-- TODO: when the performance problem occurs, consider optimize the logic here.
+unionDFA = DFA {
+    alphabet = S.fromList ['a', 'b', '1'],
+    states = S.fromList [uAX, uAY, uAZ, uBX, uBY, uBZ, uCX, uCY, uCZ, uDX, uDY, uDZ, uEX, uEY, uEZ, uA0, uB0, uC0, uD0, uE0, u0X, u0Y, u0Z],
+    initialState = uAX,
+    acceptStates = S.fromList [uAX, uAZ, uBX, uBZ, uCX, uCZ, uDX, uDZ, uEX, uEY, uEZ, uE0, u0X, u0Z],
+    transTable = makeTransTable [
+        -- Dual State Transitions
+        (uAX, 'a', uBY), (uAX, 'b', uC0), (uAX, '1', u0Z),
+        (uAY, 'a', uBX), (uAY, 'b', uC0), {-uAY, 1, u00,-}
+        (uAZ, 'a', uB0), (uAZ, 'b', uC0), (uAZ, '1', u0Y),
+        (uBX, 'a', uBY), (uBX, 'b', uD0), (uBX, '1', u0Z),
+        (uBY, 'a', uBX), (uBY, 'b', uD0), {-uBY, 1, u00,-}
+        (uBZ, 'a', uB0), (uBZ, 'b', uD0), (uBZ, '1', u0Y),
+        (uCX, 'a', uBY), (uCX, 'b', uC0), (uCX, '1', u0Z),
+        (uCY, 'a', uBX), (uCY, 'b', uC0), {-uCY, 1, u00,-}
+        (uCZ, 'a', uB0), (uCZ, 'b', uC0), (uCZ, '1', u0Y),
+        (uDX, 'a', uBY), (uDX, 'b', uE0), (uDX, '1', u0Z),
+        (uDY, 'a', uBX), (uDY, 'b', uE0), {-uDY, 1, u00,-}
+        (uDZ, 'a', uB0), (uDZ, 'b', uE0), (uDZ, '1', u0Y),
+        (uEX, 'a', uBY), (uEX, 'b', uC0), (uEX, '1', u0Z),
+        (uEY, 'a', uBX), (uEY, 'b', uC0), {-uEY, 1, u00,-}
+        (uEZ, 'a', uB0), (uEZ, 'b', uC0), (uEZ, '1', u0Y),
+        -- Single State Transtions
+        (uA0, 'a', uB0), (uA0, 'b', uC0), {-uA0, 1, u00,-}
+        (uB0, 'a', uB0), (uB0, 'b', uD0), {-uB0, 1, u00,-}
+        (uC0, 'a', uB0), (uC0, 'b', uC0), {-uC0, 1, u00,-}
+        (uD0, 'a', uB0), (uD0, 'b', uE0), {-uD0, 1, u00,-}
+        (uE0, 'a', uB0), (uE0, 'b', uC0), {-uE0, 1, u00,-}
+        (u0X, 'a', u0Y), {-u0X, b, u00,-} (u0X, '1', u0Z),
+        (u0Y, 'a', u0X), {-u0Y, b, u00,-} {-u0Y, 1, u00,-}
+        {-u0Z, a, u00,-} {-u0Z, b, u00,-} (u0Z, '1', u0Y)
     ]
 }
