@@ -24,7 +24,7 @@ parseLexer :: GenParser Char Lexer Lexer
 parseLexer = do
     skipMany trim
     -- Parse Definition Section
-    userDefs <- betweenStr "%{" "%}" anyChar
+    userDefs <- betweenStrMany "%{" "%}" anyChar
     updateState $ \lexer -> lexer { userDefs }
     -- Parse Regex Definitions
     manyTill (trim <|> parseRegexDef) (string "%%")
@@ -62,10 +62,7 @@ trim :: GenParser Char Lexer ()
 trim = void space <|> void comment -- Trim spaces and comments
 
 comment :: GenParser Char Lexer String
-comment = betweenStr "/*" "*/" anyChar
-
-betweenStr :: String -> String -> GenParser Char st a -> GenParser Char st [a]
-betweenStr open close p = string open >> manyTill p (string close)
+comment = betweenStrMany "/*" "*/" anyChar
 
 input = "a|b|c"
 

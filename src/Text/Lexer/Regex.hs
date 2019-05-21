@@ -4,6 +4,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Map ((!))
+import Data.List ((\\))
 import Text.ParserCombinators.Parsec hiding (State)
 
 data Regex = Epsilon
@@ -13,6 +14,18 @@ data Regex = Epsilon
            | Closure Regex
            | Endmark
            deriving (Eq, Ord, Read, Show)
+
+symbols :: [Char] -> [Regex]
+symbols = map Symbol
+
+unions :: [Regex] -> Regex
+unions = foldl1 Union
+
+concats :: [Regex] -> Regex
+concats = foldl1 Concat
+
+unionChars :: [Char] -> Regex
+unionChars = unions . symbols
 
 showRegex :: Regex -> String
 showRegex = run where
@@ -28,72 +41,50 @@ readRegex s = case parse (parseRegex M.empty) "" s of
     Left err -> error $ show err
     Right re -> re
 
-parseRegex :: M.Map String Regex -> GenParser Char state Regex
+parseRegex :: M.Map String Regex -> GenParser Char st Regex
 parseRegex symbolTable = regex where
-    regex       = try union  <|> simpleReg
-    union       = simpleReg `chainl1` (Union <$ char '|')
-    simpleReg   = try concat <|> basicReg
-    concat      = basicReg  `chainl1` (return Concat)
+    regex     = try union <|> simpleReg
+    union     = simpleReg `chainl1` (char '|' >> return Union)
+    simpleReg = try concat <|> basicReg
+    concat    = basicReg  `chainl1` (return Concat)
+    basicReg  = try star <|> try plus <|> try question <|> elemReg
+    star      = elemReg <* char '*' >>= return . Closure
+    plus      = elemReg <* char '+' >>= return . \r -> Concat r (Closure r)
+    question  = elemReg <* char '?' >>= return . Union Epsilon
+    elemReg   = try userDef <|> try symbol <|> try epsilon <|> try any <|> try group <|> set
+    userDef   = betweenStrMany "{" "}" anyChar >>= return . (symbolTable !)
+    group     = betweenStrOne  "(" ")" regex
+    any       = char '.' >> return (unionChars charset)
+    epsilon   = char 'ε' >> return Epsilon
+    symbol    = character >>= return . Symbol
+    character = try meta <|> try escape <|> oneOf (charset \\ metaChars)
+    meta      = char '\\' *> oneOf metaChars -- try meta first, or \\* will be parsed into Closure (Symbol '\\')
+    escape    = char '\\' *> oneOf escapeChars >>= return . unescape
+    set       = try negSet <|> posSet
+    posSet    = betweenStrOne "["  "]" setItems >>= return . unionChars
+    negSet    = betweenStrOne "[^" "]" setItems >>= return . unionChars . (charset \\)
+    setItems  = setItem `chainl1` return L.union
+    setItem   = try (return <$> setEscape) <|> try range <|> (return <$> character)
+    setEscape = char '\\' *> oneOf ['-']
+    range     = enumFromTo <$> character <* char '-' <*> character
 
-    basicReg    = try star   <|> try plus <|> try question <|> elemReg
-    star        = Closure <$> elemReg <* char '*'
-    plus        = do
-        r <- elemReg
-        char '+'
-        return $ Concat r (Closure r)
-    question    = do
-        r <- elemReg
-        char '?'
-        return $ Union r Epsilon
+charset :: [Char]
+charset = ['A'..'Z'] ++ ['a'..'z'] ++ ['0'..'9'] ++ "!#%',/:;<=>{}&_-~\\\"|.*+?()[^]\n\t\v\f "
 
-    elemReg     = try userDef <|> try symbol <|> try epsilon <|> try any <|> try group <|> set
-    userDef     = do
-        char '{'
-        name  <- manyTill anyChar (char '}')
-        return $ unpack (M.lookup name symbolTable) where
-            unpack (Just regex) = regex
-            -- TODO: should raise error here
-            -- unpack Nothing = Epsilon
-    group       = between (char '(') (char ')') regex
-    epsilon     = Epsilon <$  char 'ε'
-    any         = do
-        char '.'
-        return $ foldl1 (\a b -> Union a b) (Symbol <$> alphabet)
+metaChars :: [Char]
+metaChars = "\\|.*+?(){}[]ε"
 
-    set         = try negSet <|> posSet
-    negSet      = do
-        string "[^"
-        alphas <- setItems
-        char ']'
-        return $ foldl1 (\a b -> Union a b) (Symbol <$> [ x | x <- alphabet, not $ x `elem` alphas])
-    posSet      = do
-        char '['
-        alphas <- setItems
-        char ']'
-        return $ foldl1 (\a b -> Union a b) (Symbol <$> alphas)
-    setItems    = setItem `chainl1` (return (++))
-    setItem     = try range <|> unpack <$> symbol where unpack (Symbol c) = [c]
-    range       = do
-        l <- symbol
-        char '-'
-        r <- symbol
-        return $ [(unpack l)..(unpack r)] where unpack (Symbol c) = c
-    symbol      = try meta <|> try escape <|> Symbol <$> noneOf metaChars
-    -- try meta first, otherwise \\* will be parsed into Closure (Symbol '\\')
-    meta        = do
-        char '\\'
-        r <- oneOf metaChars
-        return $ Symbol r
-    -- note that in '.l' files, '\t' is actually presented as '\\t'
-    escape      = do
-        char '\\'
-        r <- oneOf escapeChars
-        return $ Symbol (norm r) where
-            norm 'n' = '\n'
-            norm 't' = '\t'
-            norm 'v' = '\v'
-            norm 'f' = '\f'
+escapeMap :: M.Map Char Char
+escapeMap = M.fromList [('n', '\n'), ('t', '\t'), ('v', '\v'), ('f', '\f')]
 
-    metaChars = "\\|.*+?()[^]ε"
-    escapeChars = "ntvf"
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%',/:;<=>{}&_-~\\\"|.*+?()[^]\n\t\v\f "
+escapeChars :: [Char]
+escapeChars = M.keys escapeMap
+
+unescape :: Char -> Char
+unescape = (escapeMap !)
+
+betweenStrMany :: String -> String -> GenParser Char st a -> GenParser Char st [a]
+betweenStrMany open close p = string open >> manyTill p (string close)
+
+betweenStrOne :: String -> String -> GenParser Char st a -> GenParser Char st a
+betweenStrOne open close = between (string open) (string close)

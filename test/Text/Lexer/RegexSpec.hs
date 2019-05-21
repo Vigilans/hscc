@@ -18,22 +18,25 @@ spec = do
     describe "Regex Parser" $ do
         it "a+ is a(a)*" $
             readAndShow "a+" `shouldBe` "a(a)*"
+        it "a? is (ε|a)" $
+            readAndShow "a?" `shouldBe` "(ε|a)"
         it "[a-c] is ((a|b)|c)" $
             readAndShow "[a-c]" `shouldBe` "((a|b)|c)"
         it "[a-cA-C ] is ((((((a|b)|c)|A)|B)|C)| )" $
             readAndShow "[a-cA-C ]" `shouldBe` "((((((a|b)|c)|A)|B)|C)| )"
-        it "[\\\\\\t\\+\"] is (((\\|\t)|+)|\")" $ 
+        it "[\\\\\\t\\+\"] is (((\\|\t)|+)|\")" $
             readAndShow "[\\\\\\t\\+\"]" `shouldBe` "(((\\|\t)|+)|\")"
-        it "[\\[\\]] is ([|])" $ 
+        it "[\\[\\]] is ([|])" $
             readAndShow "[\\[\\]]" `shouldBe` "([|])"
         it "[aaaa] is a" $
             readAndShow "[aaaa]" `shouldBe` "a"
+        it "[aaaaba-c] is ((a|b)|c)" $
+            readAndShow "[aaaaba-c]" `shouldBe` "((a|b)|c)"
         it "a\\t\\* is a\t*" $
             readAndShow "a\\t\\*" `shouldBe` "a\t*"
         it "a\\t\\**\\\\+ is a\t(*)*\\(\\)*" $
             readAndShow "a\\t\\**\\\\+" `shouldBe` "a\t(*)*\\(\\)*"
-        -- TODO: negSet has bug here
-        -- TODO: remove the second '-' below and see what will happen
-        -- TODO: it may also not handle meta or escape chars correctly
-        it "[^A-Za-z0-9!#%',/:;<=>{}&_-~\\|\\.\\*\\+\\?\\)\\(-] is (((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )" $
-            readAndShow "[^A-Za-z0-9!#%',/:;<=>{}&_-~\\|\\.\\*\\+\\?\\)\\(-]"`shouldBe` "(((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )"
+        it "[^A-Za-z0-9!#%',/:;<=>\\{\\}&_~\\|\\.\\*\\+\\?\\)\\(] is ((((((((((-|\\)|\")|[)|^)|])|\\n)|\\t)|\\v)|\\f)| )" $
+            readAndShow "[^A-Za-z0-9!#%',/:;<=>\\{\\}&_~\\|\\.\\*\\+\\?\\)\\(]"`shouldBe` "((((((((((-|\\)|\")|[)|^)|])|\n)|\t)|\v)|\f)| )"
+        it "[^A-Za-z0-9!#%',/:;<=>\\{\\}&_\\-~\\|\\.\\*\\+\\?\\)\\(] is (((((((((\\|\")|[)|^)|])|\\n)|\\t)|\\v)|\\f)| )" $
+            readAndShow "[^A-Za-z0-9!#%',/:;<=>\\{\\}&_\\-~\\|\\.\\*\\+\\?\\)\\(]"`shouldBe` "(((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )"
