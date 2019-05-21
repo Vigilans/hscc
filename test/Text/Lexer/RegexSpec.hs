@@ -20,3 +20,17 @@ spec = do
             readAndShow "a+" `shouldBe` "a(a)*"
         it "[a-c] is ((a|b)|c)" $
             readAndShow "[a-c]" `shouldBe` "((a|b)|c)"
+        it "[a-cA-C ] is ((((((a|b)|c)|A)|B)|C)| )" $
+            readAndShow "[a-cA-C ]" `shouldBe` "((((((a|b)|c)|A)|B)|C)| )"
+        -- it "[aaaa] is a" $
+            -- readAndShow "[aaaa]" `shouldBe` "a"
+        it "a\\t\\* is a\t*" $
+            readAndShow "a\\t\\*" `shouldBe` "a\t*"
+        -- TODO: negSet has bug here
+        -- TODO: remove the second '-' below and see what will happen
+        -- TODO: it may also not handle meta or escape chars correctly
+        it "[^A-Za-z0-9!#%',/:;<=>{}&_-~\\|\\.\\*\\+\\?\\)\\(-] is (((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )" $
+            readAndShow "[^A-Za-z0-9!#%',/:;<=>{}&_-~\\|\\.\\*\\+\\?\\)\\(-]"`shouldBe` "(((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )"
+        
+        
+        
