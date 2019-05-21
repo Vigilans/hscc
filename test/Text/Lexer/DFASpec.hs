@@ -3,7 +3,7 @@ module Text.Lexer.DFASpec where
 import Test.Hspec
 import Test.QuickCheck
 import Text.Lexer.DFA
-import qualified Data.Set as S
+import qualified Data.Set.Monad as S
 import qualified Data.Map as M
 
 -- Helper state function

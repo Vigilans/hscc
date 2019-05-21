@@ -3,7 +3,7 @@ module Text.Lexer.DFA.Regex where
 import Text.Lexer.Regex
 import qualified Text.Lexer.DFA as DFA
 import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Set.Monad as S
 import qualified Data.Sequence as Q -- As queue
 import Data.Map ((!))
 import Data.Sequence (Seq((:<|), (:|>)))
@@ -44,17 +44,17 @@ regexFunction re = runState (run re) (RegexPose M.empty M.empty) where
         c1 <- run c1'
         c2 <- run c2'
         modify $ \rf@RegexPose { followpos } -> rf {
-            followpos = S.foldr (M.adjust $ S.union (firstpos c2)) followpos (lastpos c1)
+            followpos = S.foldr (M.adjust (firstpos c2 <>)) followpos (lastpos c1)
         }
         return RegexAttr {
             nullable = nullable c1 && nullable c2,
-            firstpos = firstpos c1 <> (if nullable c1 then firstpos c2 else S.empty),
-            lastpos  = lastpos  c2 <> (if nullable c2 then lastpos  c1 else S.empty)
+            firstpos = firstpos c1 <> join [firstpos c2 | nullable c1],
+            lastpos  = lastpos  c2 <> join [lastpos  c1 | nullable c2]
         }
     run n@(Closure c') = do
         c <- run c'
         modify $ \rf@RegexPose { followpos } -> rf {
-            followpos = S.foldr (M.adjust $ S.union (firstpos c)) followpos (lastpos c)
+            followpos = S.foldr (M.adjust (firstpos c <>)) followpos (lastpos c)
         }
         return RegexAttr {
             nullable = True,
@@ -70,8 +70,8 @@ regexFunction re = runState (run re) (RegexPose M.empty M.empty) where
         }
         return RegexAttr {
             nullable  = False,
-            firstpos  = S.singleton i,
-            lastpos   = S.singleton i
+            firstpos  = pure i,
+            lastpos   = pure i
         }
 
 data RegexToDFAState = R2DS {

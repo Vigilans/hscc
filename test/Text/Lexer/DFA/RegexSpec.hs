@@ -6,7 +6,7 @@ import Text.Lexer.Regex
 import Text.Lexer.DFA.Regex
 import Text.Lexer.DFA
 import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Set.Monad as S
 
 regex :: Regex
 regex = readRegex "(a|b)*abb"

@@ -2,10 +2,12 @@ module Text.Lexer.DFA where
 
 import qualified Data.List as L
 import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Set.Monad as S
+import Data.Set (findIndex)
 import Data.Map ((!), (!?))
-import Data.Set ((\\))
+import Data.Set.Monad ((\\))
 import Data.Maybe
+import Control.Monad
 
 data State = Empty | State {
     code :: S.Set Int,
@@ -74,17 +76,17 @@ partition :: DFA -> Partition -> Partition
 partition dfa = run [] where
     run front [] = front
     run front (group:back) = run (front ++ subgroups) back where
-        mapper s = S.map (trans dfa s) (alphabet dfa)
-        folder s = M.insertWith S.union (mapper s) (S.singleton s)
+        mapper s = trans dfa s <$> alphabet dfa
+        folder s = M.insertWith (<>) (mapper s) (pure s)
         subgroups = M.elems $ S.foldr folder M.empty group
 
 mapStates :: (State -> State) -> DFA -> DFA
 mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
     f' s = if s /= Empty then f s else Empty
     initialState' = f' initialState
-    acceptStates' = S.map f' acceptStates \\ S.singleton Empty
-    mapAlphabet s = S.fromList [(f' s, c, f' s') | c <- S.toList alphabet, let s' = trans dfa s c, f' s' /= Empty]
-    transitions   = S.foldl S.union S.empty $ S.map mapAlphabet states
+    acceptStates' = fmap f' acceptStates \\ pure Empty
+    mapAlphabet s = [(f' s, c, f' s') | c <- alphabet, let s' = trans dfa s c, f' s' /= Empty]
+    transitions   = join $ S.map mapAlphabet states
     in build (transitions, initialState', acceptStates')
 
 minimize :: DFA -> DFA
@@ -99,23 +101,23 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     repState s = fromJust $ S.findMin <$> L.find (S.member s) finalPartition
 
 makeIndex :: DFA -> Int -> DFA
-makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (S.findIndex s (states dfa) + offset) }) dfa
+makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (getIndex s + offset) }) dfa
+    where getIndex s = findIndex s (S.toPreludeSet $ states dfa)
 
 union :: DFA -> DFA -> DFA
 union a' b' = let
     a = makeIndex a' 0
     b = makeIndex b' (S.size $ states a)
-    transitions = S.fromList [ (from, c, to) |
-        c <- S.toList (alphabet a <> alphabet b),
-        x <- Empty : S.toList (states a),
-        y <- Empty : S.toList (states b),
-        let from = x <> y; to = trans a x c <> trans b y c,
-        to /= Empty
+    transitions = [ (from, c, to) |
+        c <- alphabet a <> alphabet b,
+        x <- states a <> pure Empty,
+        y <- states b <> pure Empty,
+        let from = x <> y; to = trans a x c <> trans b y c, to /= Empty
         ]
     initial = initialState a <> initialState b
-    accepts = S.fromList [ x <> y |
-        x <- Empty : S.toList (states a),
-        y <- Empty : S.toList (states b),
+    accepts = [ x <> y |
+        x <- states a <> pure Empty,
+        y <- states b <> pure Empty,
         S.member x (acceptStates a) || S.member y (acceptStates b)
         ]
     in build (transitions, initial, accepts)

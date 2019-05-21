@@ -2,7 +2,7 @@ module Text.Lexer.Regex where
 
 import qualified Data.List as L
 import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Set.Monad as S
 import Data.Map ((!))
 import Data.List ((\\))
 import Text.ParserCombinators.Parsec hiding (State)
