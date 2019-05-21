@@ -1,6 +1,4 @@
-module Text.Lexer.DFA.Regex (
-    regex2dfa
-) where
+module Text.Lexer.DFA.Regex where
 
 import Text.Lexer.Regex
 import qualified Text.Lexer.DFA as DFA
@@ -12,65 +10,68 @@ import Data.Sequence (Seq((:<|), (:|>)))
 import Control.Monad.State
 
 type Position = Int
-type Positions = S.Set Int
+type Positions = S.Set Position
 
-data RegexFunction = RegexFunction {
-    nullable  :: M.Map Regex Bool,
-    firstpos  :: M.Map Regex Positions,
-    lastpos   :: M.Map Regex Positions,
+data RegexAttr = RegexAttr {
+    nullable :: Bool,
+    firstpos :: Positions,
+    lastpos  :: Positions
+}
+
+data RegexPose = RegexPose {
     followpos :: M.Map Position Positions,
     leafsymb  :: M.Map Position Regex
 }
 
 -- Post-order traversal
-regexFunction :: Regex -> RegexFunction
-regexFunction re = execState (run re) (RegexFunction M.empty M.empty M.empty M.empty M.empty) where
+regexFunction :: Regex -> (RegexAttr, RegexPose)
+regexFunction re = runState (run re) (RegexPose M.empty M.empty) where
     run n@Epsilon =
-        modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
-            nullable  = M.insert n True nullable,
-            firstpos  = M.insert n S.empty firstpos,
-            lastpos   = M.insert n S.empty lastpos,
-            followpos = followpos,
-            leafsymb  = leafsymb
+        return RegexAttr {
+            nullable = True,
+            firstpos = S.empty,
+            lastpos  = S.empty
         }
-    run n@(Union c1 c2) = do
-        run c1
-        run c2
-        modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
-            nullable  = M.insert n ((nullable ! c1) || (nullable ! c2)) nullable,
-            firstpos  = M.insert n ((firstpos ! c1) <> (firstpos ! c2)) firstpos,
-            lastpos   = M.insert n ((lastpos  ! c1) <> (lastpos  ! c2)) lastpos,
-            followpos = followpos,
-            leafsymb  = leafsymb
+    run n@(Union c1' c2') = do
+        c1 <- run c1'
+        c2 <- run c2'
+        return RegexAttr {
+            nullable = nullable c1 || nullable c2,
+            firstpos = firstpos c1 <> firstpos c2,
+            lastpos  = lastpos  c1 <> lastpos  c2
         }
-    run n@(Concat c1 c2) = do
-        run c1
-        run c2
-        modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
-            nullable  = M.insert n ((nullable ! c1) && (nullable ! c2)) nullable,
-            firstpos  = M.insert n ((firstpos ! c1) <> (if nullable ! c1 then firstpos ! c2 else S.empty)) firstpos,
-            lastpos   = M.insert n ((lastpos  ! c2) <> (if nullable ! c2 then lastpos  ! c1 else S.empty)) lastpos,
-            followpos = S.foldr (M.adjust $ S.union (firstpos ! c2)) followpos (lastpos ! c1),
-            leafsymb  = leafsymb
+    run n@(Concat c1' c2') = do
+        c1 <- run c1'
+        c2 <- run c2'
+        modify $ \rf@RegexPose { followpos } -> rf {
+            followpos = S.foldr (M.adjust $ S.union (firstpos c2)) followpos (lastpos c1)
         }
-    run n@(Closure c) = do
-        run c
-        modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
-            nullable  = M.insert n True nullable,
-            firstpos  = M.insert n (firstpos ! c) firstpos,
-            lastpos   = M.insert n (lastpos  ! c) lastpos,
-            followpos = S.foldr (M.adjust $ S.union (firstpos ! n)) followpos (lastpos ! n),
-            leafsymb  = leafsymb
+        return RegexAttr {
+            nullable = nullable c1 && nullable c2,
+            firstpos = firstpos c1 <> (if nullable c1 then firstpos c2 else S.empty),
+            lastpos  = lastpos  c2 <> (if nullable c2 then lastpos  c1 else S.empty)
+        }
+    run n@(Closure c') = do
+        c <- run c'
+        modify $ \rf@RegexPose { followpos } -> rf {
+            followpos = S.foldr (M.adjust $ S.union (firstpos c)) followpos (lastpos c)
+        }
+        return RegexAttr {
+            nullable = True,
+            firstpos = firstpos c,
+            lastpos  = lastpos  c
         }
     run n = do -- Symbol or Endmarker
         poses <- gets leafsymb
         let i = maximum (0 : M.keys poses) + 1
-        modify $ \RegexFunction { nullable, firstpos, lastpos, followpos, leafsymb } -> RegexFunction {
-            nullable  = M.insert n False nullable,
-            firstpos  = M.insert n (S.singleton i) firstpos,
-            lastpos   = M.insert n (S.singleton i) lastpos,
+        modify $ \rf@RegexPose { followpos, leafsymb } -> rf {
             followpos = M.insert i S.empty followpos,
             leafsymb  = M.insert i n leafsymb
+        }
+        return RegexAttr {
+            nullable  = False,
+            firstpos  = S.singleton i,
+            lastpos   = S.singleton i
         }
 
 data RegexToDFAState = R2DS {
@@ -79,18 +80,21 @@ data RegexToDFAState = R2DS {
     accepts :: S.Set DFA.State
 }
 
+augment :: Regex -> Regex
+augment r = Concat r Endmark
+
 regex2dfa :: Regex -> DFA.Tag -> DFA.DFA
 regex2dfa reg tag = let
     -- Augment regex with '#'
-    aug = Union reg Endmark
+    aug = augment reg
     -- Compute regex functions
-    RegexFunction { firstpos, followpos, leafsymb } = regexFunction aug
+    (RegexAttr{ firstpos }, RegexPose{ followpos, leafsymb }) = regexFunction aug
     -- Prepare DFA invariants and utility functions
     inputSymbs = [s | Symbol s <- M.elems leafsymb]
     endmarkPos = head [i | (i, Endmark) <- M.assocs leafsymb]
     isAccept   = S.member endmarkPos
     newState c = DFA.State c [tag | isAccept c]
-    initState  = newState (firstpos ! aug)
+    initState  = newState firstpos
     -- Run a queue to generate DFA
     run :: Q.Seq DFA.State -> State RegexToDFAState DFA.DFA
     run Q.Empty = gets $ \(R2DS ts ss as) -> DFA.build (ts, initState, as)
