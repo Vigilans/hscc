@@ -22,8 +22,10 @@ spec = do
             readAndShow "[a-c]" `shouldBe` "((a|b)|c)"
         it "[a-cA-C ] is ((((((a|b)|c)|A)|B)|C)| )" $
             readAndShow "[a-cA-C ]" `shouldBe` "((((((a|b)|c)|A)|B)|C)| )"
-        it "[\\\\\\t\\+] is ((\\|\t)|+)" $ 
-            readAndShow "[\\\\\\t\\+]" `shouldBe` "((\\|\t)|+)"
+        it "[\\\\\\t\\+\"] is (((\\|\t)|+)|\")" $ 
+            readAndShow "[\\\\\\t\\+\"]" `shouldBe` "(((\\|\t)|+)|\")"
+        it "[\\[\\]] is ([|])" $ 
+            readAndShow "[\\[\\]]" `shouldBe` "([|])"
         it "[aaaa] is a" $
             readAndShow "[aaaa]" `shouldBe` "a"
         it "a\\t\\* is a\t*" $
@@ -35,6 +37,3 @@ spec = do
         -- TODO: it may also not handle meta or escape chars correctly
         it "[^A-Za-z0-9!#%',/:;<=>{}&_-~\\|\\.\\*\\+\\?\\)\\(-] is (((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )" $
             readAndShow "[^A-Za-z0-9!#%',/:;<=>{}&_-~\\|\\.\\*\\+\\?\\)\\(-]"`shouldBe` "(((((((((\\|\")|[)|^)|])|\n)|\t)|\v)|\f)| )"
-        
-        
-        
