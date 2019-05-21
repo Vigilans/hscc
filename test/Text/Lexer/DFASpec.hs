@@ -7,15 +7,21 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 -- Helper state function
-state :: [Int] -> State
-state code = State { code = S.fromList code, tags = ["test"] }
+state :: [Int] -> [String] -> State
+state code tags = State { code = S.fromList code, tags }
+
+stateTest :: [Int] -> State
+stateTest code = state code ["test"]
+
+makeTransTable :: [Transition] -> M.Map (State, Condition) State
+makeTransTable = M.fromList . map (\(from, ch, to) -> ((from, ch), to))
 
 -- States in Purple Dragon 3-36
-sA = state [1, 2, 3]
-sB = state [1, 2, 3, 4]
-sC = state [1, 2, 3, 5]
-sD = state [1, 2, 3, 6]
-sE = state [1, 2, 3, 7]
+sA = stateTest [1, 2, 3]
+sB = stateTest [1, 2, 3, 4]
+sC = stateTest [1, 2, 3, 5]
+sD = stateTest [1, 2, 3, 6]
+sE = stateTest [1, 2, 3, 7]
 
 -- Transitions
 tAa = (sA, 'a', sB)
@@ -39,8 +45,8 @@ accepts = S.fromList [sE]
 allStates :: S.Set State
 allStates = S.fromList [sA, sB, sC, sD, sE]
 
-transitions :: [Transition]
-transitions = [tAa, tAb, tBa, tBb, tCa, tCb, tDa, tDb, tEa, tEb]
+transitions :: S.Set Transition
+transitions = S.fromList [tAa, tAb, tBa, tBb, tCa, tCb, tDa, tDb, tEa, tEb]
 
 charset :: S.Set Char
 charset = S.fromList ['a', 'b']
@@ -51,7 +57,7 @@ dfa = DFA {
     states = allStates,
     initialState = initial,
     acceptStates = accepts,
-    transTable = M.fromList $ map (\(from, ch, to) -> ((from, ch), to)) transitions
+    transTable = makeTransTable $ S.toList transitions
 }
 
 -- Main spec
@@ -94,21 +100,36 @@ spec = do
             [code s | s <- S.toList . states $ makeIndex dfa 1] `shouldBe` S.singleton <$> [1..5]
         it "should stay the same when applied on empty dfa" $
             makeIndex empty 0 `shouldBe` empty
+        it "should be equal to hard-coded dfa" $
+            makeIndex dfa 0 `shouldBe` indexDFA
 
-    describe "DFA Union" $ do
+    describe "DFA Union State" $ do
         it "should stay the same when union with Empty state" $
             S.map (Empty <>) allStates `shouldBe` allStates
         it "A <> X -> State [1, 2, 3, 4] [\"test\", \"union\"]" $
-            sA <> sX `shouldBe` stateT [1, 2, 3, 4] ["test", "union"]
+            sA <> sX `shouldBe` state [1, 2, 3, 4] ["test", "union"]
         it "B <> Y -> State [1, 2, 3, 4] [\"test\"]" $
-            sB <> sY `shouldBe` stateT [1, 2, 3, 4] ["test"]
+            sB <> sY `shouldBe` state [1, 2, 3, 4] ["test"]
         it "A <> Z -> State [1, 2, 3, 4, 5, 6] [\"test\", \"union\", \"more\"]" $
-            sA <> sZ `shouldBe` stateT [1, 2, 3, 4, 5, 6] ["test", "union", "more"]
+            sA <> sZ `shouldBe` state [1, 2, 3, 4, 5, 6] ["test", "union", "more"]
 
--- Stuff for DFA union
-stateT :: [Int] -> [String] -> State
-stateT code tags = State { code = S.fromList code, tags }
+{- ------- Stuff for DFA makeIndex ------- -}
+sA' = sA { code = S.singleton 0 };
+sB' = sB { code = S.singleton 1 };
+sC' = sC { code = S.singleton 2 };
+sD' = sD { code = S.singleton 3 };
+sE' = sE { code = S.singleton 4 };
 
-sX = stateT [2, 3, 4] ["union"]
-sY = stateT [1, 2, 3] []
-sZ = stateT [4, 5, 6] ["union", "more"]
+indexDFA = DFA {
+    alphabet = charset,
+    states = S.fromList [sA', sB', sC', sD', sE'],
+    initialState = sA',
+    acceptStates = S.fromList [sE'],
+    transTable = makeTransTable [
+        (sA', 'a', sB'), (sA', 'b', sC'),
+        (sB', 'a', sB'), (sB', 'b', sD'),
+        (sC', 'a', sB'), (sC', 'b', sC'),
+        (sD', 'a', sB'), (sD', 'b', sE'),
+        (sE', 'a', sB'), (sE', 'b', sC')
+    ]
+}

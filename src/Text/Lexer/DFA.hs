@@ -3,9 +3,9 @@ module Text.Lexer.DFA where
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe
 import Data.Map ((!), (!?))
 import Data.Set ((\\))
+import Data.Maybe
 
 data State = Empty | State {
     code :: S.Set Int,
@@ -16,6 +16,9 @@ instance Semigroup State where
     Empty <> b = b
     a <> Empty = a
     a <> b = State (code a <> code b) (tags a <> tags b)
+
+instance Monoid State where
+    mempty = Empty
 
 type Tag = String
 type Condition  = Char
@@ -38,9 +41,15 @@ accept dfa s = S.member s $ acceptStates dfa
 empty :: DFA
 empty = DFA S.empty S.empty Empty S.empty M.empty
 
-build :: ([Transition], State, S.Set State) -> DFA
+instance Semigroup DFA where
+    (<>) = union
+
+instance Monoid DFA where
+    mempty = empty
+
+build :: (S.Set Transition, State, S.Set State) -> DFA
 build (transitions, initialState, acceptStates) = let
-    (alphabet, states, transTable) = foldl (\(conds, states, table) (from, cond, to) -> (
+    (alphabet, states, transTable) = S.foldl (\(conds, states, table) (from, cond, to) -> (
             S.insert cond conds,
             foldr S.insert states [from, to],
             M.insert (from, cond) to table
@@ -68,14 +77,11 @@ partition dfa = run [] where
 mapStates :: (State -> State) -> DFA -> DFA
 mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
     f' s = if s /= Empty then f s else Empty
-    mapAlphabet :: State -> M.Map (State, Condition) State
-    mapAlphabet s = M.fromList [((s, c), f' $ trans dfa s c) | c <- S.toList alphabet]
     initialState' = f' initialState
     acceptStates' = S.map f' acceptStates \\ S.singleton Empty
-    states'       = S.map f' states \\ S.singleton Empty
-    transTable'   = S.foldr (M.union . mapAlphabet) M.empty states'
-    alphabet'     = S.map snd $ M.keysSet transTable'
-    in DFA alphabet' states' initialState' acceptStates' transTable'
+    mapAlphabet s = S.fromList [(f' s, c, f' s') | c <- S.toList alphabet, let s' = trans dfa s c, f' s' /= Empty]
+    transitions   = S.foldl S.union S.empty $ S.map mapAlphabet states
+    in build (transitions, initialState', acceptStates')
 
 minimize :: DFA -> DFA
 minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
@@ -92,10 +98,10 @@ makeIndex :: DFA -> Int -> DFA
 makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (S.findIndex s (states dfa) + offset) }) dfa
 
 union :: DFA -> DFA -> DFA
-union a b = let
-    a = makeIndex a 0
-    b = makeIndex b (S.size $ states a)
-    transitions = [ (from, c, to) |
+union a' b' = let
+    a = makeIndex a' 0
+    b = makeIndex b' (S.size $ states a)
+    transitions = S.fromList [ (from, c, to) |
         c <- S.toList (alphabet a <> alphabet b),
         x <- Empty : S.toList (states a),
         y <- Empty : S.toList (states b),
@@ -111,4 +117,4 @@ union a b = let
     in build (transitions, initial, accepts)
 
 unions :: [DFA] -> DFA
-unions = foldl union empty
+unions = mconcat

@@ -74,7 +74,7 @@ regexFunction re = execState (run re) (RegexFunction M.empty M.empty M.empty M.e
         }
 
 data RegexToDFAState = R2DS {
-    trans   :: [DFA.Transition],
+    trans   :: S.Set DFA.Transition,
     states  :: S.Set DFA.State,
     accepts :: S.Set DFA.State
 }
@@ -101,7 +101,7 @@ regex2dfa reg tag = let
                 uCode = S.unions [followpos ! p | p <- sCode, leafsymb ! p == Symbol a]
                 u = newState uCode
             -- Add new transition
-            modify $ \r2ds -> r2ds { trans = (s, a, u) : trans }
+            modify $ \r2ds -> r2ds { trans = S.insert (s, a, u) trans }
             -- Check whether it is a new state
             if S.notMember u states then do
                 -- Add to total states
@@ -113,4 +113,4 @@ regex2dfa reg tag = let
                 return (queue :|> u)
             else return queue) rest inputSymbs
         run queue
-    in evalState (run $ Q.singleton initState) (R2DS [] S.empty S.empty)
+    in evalState (run $ Q.singleton initState) (R2DS S.empty S.empty S.empty)
