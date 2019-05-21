@@ -96,4 +96,4 @@ parseRegex symbolTable = regex where
 
     metaChars = "\\|.*+?()[^]ε"
     escapeChars = "ntvf"
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%',/:;<=>{}&_ ?()[].^*+-~|\n\t\v\f\"\\"
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%',/:;<=>{}&_-~\\\"|.*+?()[^]\n\t\v\f "
