@@ -5,6 +5,7 @@ import Test.QuickCheck
 import Text.Lexer.DFA
 import qualified Data.Set.Monad as S
 import qualified Data.Map as M
+import Data.Set.Monad ((\\))
 
 -- Helper state function
 state :: [Int] -> [String] -> State
@@ -16,7 +17,7 @@ stateTest code = state code ["test"]
 makeTransTable :: [Transition] -> M.Map (State, Condition) State
 makeTransTable = M.fromList . map (\(from, ch, to) -> ((from, ch), to))
 
--- States in Purple Dragon 3-36
+-- States in Dragon Book 3-36
 sA = stateTest [1, 2, 3]
 sB = stateTest [1, 2, 3, 4]
 sC = stateTest [1, 2, 3, 5]
@@ -97,6 +98,21 @@ spec = do
         it "should delete the state and related stuff when set to Empty" $
             mapStates (\s -> if s /= sB then s else Empty) dfa `shouldBe` dfaDelB
 
+    describe "DFA Minimize" $ do
+        let initialPartition = [acceptStates dfa, states dfa \\ acceptStates dfa]
+            iter n = iterate (partition dfa) initialPartition !! n
+            a `shouldBe'` b = S.fromList a `shouldBe` S.fromList b -- Set equal
+        it "1st partition is {A, B, C, D} {E}" $
+            iter 0 `shouldBe'` map S.fromList [[sA, sB, sC, sD], [sE]]
+        it "2nd partition is {A, B, C} {D} {E}" $
+            iter 1 `shouldBe'` map S.fromList [[sA, sB, sC], [sD], [sE]]
+        it "3rd partition is {A, C} {B} {D} {E}" $
+            iter 2 `shouldBe'` map S.fromList [[sA, sC], [sB], [sD], [sE]]
+        it "4th partition is equal to 3rd partition" $
+            iter 3 `shouldBe'` iter 2
+        it "should be equal to hard-coded min dfa" $
+            minimize dfa `shouldBe` minDFA
+
     describe "DFA Making Index" $ do
         it "all states' code should be ascending indices from offset" $
             [code s | s <- S.toList . states $ makeIndex dfa 1] `shouldBe` S.singleton <$> [1..5]
@@ -149,6 +165,14 @@ spec = do
         it "should be equal to hard-coded reduced union dfa" $
             reduction unionDFA `shouldBe` unionDFA'
 
+{- ------- Stuff for DFA minimize ------- -}
+minDFA = DFA {
+    alphabet = charset,
+    states = S.fromList [sA, sB, sD, sE],
+    initialState = sA,
+    acceptStates = S.fromList [sE],
+    transTable = makeTransTable [tAa, (sA, 'b', sA), tBa, tBb, tDa, tDb, tEa, (sE, 'b', sA)]
+}
 
 {- ------- Stuff for DFA makeIndex ------- -}
 sA' = sA { code = S.singleton 0 };

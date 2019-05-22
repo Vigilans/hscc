@@ -105,10 +105,11 @@ reduction dfa@DFA { alphabet, initialState } = let
     in mapStates (\s -> if s `S.member` reachables then s else Empty) dfa
 
 partition :: DFA -> Partition -> Partition
-partition dfa = run [] where
+partition dfa groups = run [] groups where
+    findGroup s = fromJust $ L.findIndex (s `elem`) groups
     run front [] = front
     run front (group:back) = run (front ++ subgroups) back where
-        mapper s = trans dfa s <$> alphabet dfa
+        mapper s = findGroup . trans dfa s <$> alphabet dfa
         folder s = M.insertWith (<>) (mapper s) (pure s)
         subgroups = M.elems $ S.foldr folder M.empty group
 
@@ -121,7 +122,7 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     finalPartition = atomicSplit [acceptStates, states \\ acceptStates]
     -- Get representative state (it must exists)
     repState :: State -> State
-    repState s = fromJust $ S.findMin <$> L.find (S.member s) finalPartition
+    repState s = fromJust $ S.findMin <$> L.find (s `S.member`) finalPartition
 
 makeIndex :: DFA -> Int -> DFA
 makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (getIndex s + offset) }) dfa

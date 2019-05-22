@@ -36,7 +36,6 @@ spec :: Spec
 spec = do
     let (RegexAttr{ nullable, firstpos, lastpos }, RegexPose{ followpos, leafsymb }) = regexFunction regex'
     describe "Regex Functions" $ do
-
         it "augmented regex is ((a|b))*abb#" $
             showRegex regex' `shouldBe` "((a|b))*abb#"
         it "nullable, firstpos, lastpos are False, {1,2,3}, {6}" $
@@ -46,6 +45,8 @@ spec = do
         it "leaf symbols are [a, b, a, b, b, #]" $
             showRegex <$> M.elems leafsymb `shouldBe` ["a", "b", "a", "b", "b", "#"]
 
-    describe "Regex to DFA" $
+    describe "Regex to DFA" $ do
         it "should be equal to hard-coded dfa" $
             regex2dfa "regex" regex `shouldBe` regexDFA
+        it "should be minimum dfa in this example" $
+            regex2dfa "regex" regex `shouldBe` minimize (regex2dfa "regex" regex)
