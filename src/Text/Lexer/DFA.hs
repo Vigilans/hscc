@@ -84,7 +84,7 @@ mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable }
     f' s = if s /= Empty then f s else Empty
     initialState' = f' initialState
     acceptStates' = fmap f' acceptStates \\ pure Empty
-    mapAlphabet s = [(f' s, c, f' s') | c <- alphabet, let s' = trans dfa s c, f' s' /= Empty]
+    mapAlphabet s = [(f' s, c, f' s') | c <- alphabet, let s' = trans dfa s c, f' s /= Empty && f' s' /= Empty]
     transitions   = join $ S.map mapAlphabet states
     in build (transitions, initialState', acceptStates')
 

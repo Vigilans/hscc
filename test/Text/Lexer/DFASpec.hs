@@ -94,6 +94,8 @@ spec = do
             mapStates (const Empty) dfa `shouldBe` empty
         it "should stay the same when applied on empty dfa" $
             mapStates (\s@State {code} -> s { code = S.insert (-1) code }) empty `shouldBe` empty
+        it "should delete the state and related stuff when set to Empty" $
+            mapStates (\s -> if s /= sB then s else Empty) dfa `shouldBe` dfaDelB
 
     describe "DFA Making Index" $ do
         it "all states' code should be ascending indices from offset" $
@@ -103,7 +105,7 @@ spec = do
         it "should be equal to hard-coded dfa" $
             makeIndex dfa 0 `shouldBe` indexDFA
 
-    describe "DFA Union State" $ do
+    describe "DFA Union - State and Property" $ do
         it "should stay the same when union with Empty state" $
             S.map (Empty <>) allStates `shouldBe` allStates
         it "A <> X -> State [1, 2, 3, 4] [\"test\", \"union\"]" $
@@ -112,6 +114,8 @@ spec = do
             sB <> sY `shouldBe` state [1, 2, 3, 4] ["test"]
         it "A <> Z -> State [1, 2, 3, 4, 5, 6] [\"test\", \"union\", \"more\"]" $
             sA <> sZ `shouldBe` state [1, 2, 3, 4, 5, 6] ["test", "union", "more"]
+        it "should stay the same when union with empty dfa" $
+            makeIndex (dfa <> empty) 0 `shouldBe` makeIndex dfa 0
 
     describe "DFA Union - Equal to Hard-Code" $ do
         it "Equality: initialState" $
@@ -138,6 +142,13 @@ spec = do
             test unionDFA "aaaaa" `shouldBe` False
         it "should accept \"\" to [\"test\", \"union\"]" $
             run unionDFA "" `shouldBe` ["test", "union"]
+
+    describe "DFA Reduction" $ do
+        it "should even delete the accept state when applied on dfa with B deleted" $
+            reduction dfaDelB `shouldBe` dfaDelB'
+        it "should be equal to hard-coded reduced union dfa" $
+            reduction unionDFA `shouldBe` unionDFA'
+
 
 {- ------- Stuff for DFA makeIndex ------- -}
 sA' = sA { code = S.singleton 0 };
@@ -196,8 +207,6 @@ u0Y = sY { code = S.singleton 5 };
 u0Z = sZ { code = S.singleton 7 };
 {- u00 = Empty -} -- Not used
 
--- We could see that some states will never be reached here.
--- TODO: when the performance problem occurs, consider optimize the logic here.
 unionDFA = DFA {
     alphabet = S.fromList ['a', 'b', '1'],
     states = S.fromList [uAX, uAY, uAZ, uBX, uBY, uBZ, uCX, uCY, uCZ, uDX, uDY, uDZ, uEX, uEY, uEZ, uA0, uB0, uC0, uD0, uE0, u0X, u0Y, u0Z],
@@ -222,6 +231,60 @@ unionDFA = DFA {
         (uEZ, 'a', uB0), (uEZ, 'b', uC0), (uEZ, '1', u0Y),
         -- Single State Transtions
         (uA0, 'a', uB0), (uA0, 'b', uC0), {-uA0, 1, u00,-}
+        (uB0, 'a', uB0), (uB0, 'b', uD0), {-uB0, 1, u00,-}
+        (uC0, 'a', uB0), (uC0, 'b', uC0), {-uC0, 1, u00,-}
+        (uD0, 'a', uB0), (uD0, 'b', uE0), {-uD0, 1, u00,-}
+        (uE0, 'a', uB0), (uE0, 'b', uC0), {-uE0, 1, u00,-}
+        (u0X, 'a', u0Y), {-u0X, b, u00,-} (u0X, '1', u0Z),
+        (u0Y, 'a', u0X), {-u0Y, b, u00,-} {-u0Y, 1, u00,-}
+        {-u0Z, a, u00,-} {-u0Z, b, u00,-} (u0Z, '1', u0Y)
+    ]
+}
+
+{- ------- Stuff for DFA reduction ------- -}
+
+dfaDelB = DFA {
+    alphabet = S.fromList ['b'],
+    states = S.fromList [sA, sC, sD, sE],
+    initialState = sA,
+    acceptStates = S.fromList [sE],
+    transTable = makeTransTable $ [tAb, tCb, tDb, tEb]
+}
+
+-- Reduction on dfa
+dfaDelB' = DFA {
+    alphabet = S.fromList ['b'],
+    states = S.fromList [sA, sC],
+    initialState = sA,
+    acceptStates = S.empty,
+    transTable = makeTransTable $ [tAb, tCb]
+}
+
+-- Reduction on unioned dfa
+unionDFA' = DFA {
+    alphabet = S.fromList ['a', 'b', '1'],
+    states = S.fromList [uAX, uBX, uBY, uB0, uC0, uD0, uE0, u0X, u0Y, u0Z],
+    initialState = uAX,
+    acceptStates = S.fromList [uAX, uBX, uE0, u0X, u0Z],
+    transTable = makeTransTable [
+        -- Dual State Transitions
+        (uAX, 'a', uBY), (uAX, 'b', uC0), (uAX, '1', u0Z),
+        {-uAY, a, uBX,-} {-uAY, b, uC0,-} {-uAY, 1, u00,-}
+        {-uAZ, a, uB0,-} {-uAZ, b, uC0,-} {-uAZ, 1, u0Y,-}
+        (uBX, 'a', uBY), (uBX, 'b', uD0), (uBX, '1', u0Z),
+        (uBY, 'a', uBX), (uBY, 'b', uD0), {-uBY, 1, u00,-}
+        {-uAZ, a, uB0,-} {-uAZ, b, uD0,-} {-uAZ, 1, u0Y,-}
+        {-uAX, a, uBY,-} {-uAX, b, uC0,-} {-uAX, 1, u0Z,-}
+        {-uAY, a, uBX,-} {-uAY, b, uC0,-} {-uCY, 1, u00,-}
+        {-uAZ, a, uB0,-} {-uAZ, b, uC0,-} {-uAZ, 1, u0Y,-}
+        {-uAX, a, uBY,-} {-uAX, b, uE0,-} {-uAX, 1, u0Z,-}
+        {-uAY, a, uBX,-} {-uAY, b, uE0,-} {-uDY, 1, u00,-}
+        {-uAZ, a, uB0,-} {-uAZ, b, uE0,-} {-uAZ, 1, u0Y,-}
+        {-uAX, a, uBY,-} {-uAX, b, uC0,-} {-uAX, 1, u0Z,-}
+        {-uAY, a, uBX,-} {-uAY, b, uC0,-} {-uEY, 1, u00,-}
+        {-uAZ, a, uB0,-} {-uAZ, b, uC0,-} {-uAZ, 1, u0Y,-}
+        -- Single State Transtions
+        {-uA0, a, uB0,-} {-uA0, b, uC0,-} {-uA0, 1, u00,-}
         (uB0, 'a', uB0), (uB0, 'b', uD0), {-uB0, 1, u00,-}
         (uC0, 'a', uB0), (uC0, 'b', uC0), {-uC0, 1, u00,-}
         (uD0, 'a', uB0), (uD0, 'b', uE0), {-uD0, 1, u00,-}
