@@ -34,6 +34,7 @@ default-extensions:
 - MonadComprehensions
 - FlexibleContexts
 - NamedFieldPuns
+- TupleSections
 
 library:
   source-dirs: src

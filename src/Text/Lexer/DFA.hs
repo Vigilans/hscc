@@ -51,7 +51,7 @@ empty :: DFA
 empty = DFA S.empty S.empty Empty S.empty M.empty
 
 instance Semigroup DFA where
-    (<>) = union
+    a <> b = minimize . reduction $ crossUnion a b
 
 instance Monoid DFA where
     mempty = empty
@@ -106,10 +106,11 @@ reduction dfa@DFA { alphabet, initialState } = let
 
 partition :: DFA -> Partition -> Partition
 partition dfa groups = run [] groups where
-    findGroup s = fromJust $ L.findIndex (s `elem`) groups
+    findGroup s = L.findIndex (s `elem`) groups -- State mapped to different [Group] is distinguishable
+    appendTag s = (, if s /= Empty then tags s else []) -- State of different tags is distinguishable
     run front [] = front
     run front (group:back) = run (front ++ subgroups) back where
-        mapper s = findGroup . trans dfa s <$> alphabet dfa
+        mapper s = appendTag s . findGroup . trans dfa s <$> alphabet dfa
         folder s = M.insertWith (<>) (mapper s) (pure s)
         subgroups = M.elems $ S.foldr folder M.empty group
 
@@ -118,8 +119,8 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     -- Split until partition can be no more fine
     atomicSplit :: Partition -> Partition
     atomicSplit cur = if cur == new then cur else atomicSplit new where new = partition dfa cur
-    -- Get final partition
-    finalPartition = atomicSplit [acceptStates, states \\ acceptStates]
+    -- Get final partition (initial partition contains: F, S - F, and {Empty})
+    finalPartition = atomicSplit [acceptStates, states \\ acceptStates, pure Empty]
     -- Get representative state (it must exists)
     repState :: State -> State
     repState s = fromJust $ S.findMin <$> L.find (s `S.member`) finalPartition
@@ -128,11 +129,11 @@ makeIndex :: DFA -> Int -> DFA
 makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (getIndex s + offset) }) dfa
     where getIndex s = findIndex s (S.toPreludeSet $ states dfa)
 
-union :: DFA -> DFA -> DFA
-union a' b' = let
+crossUnion :: DFA -> DFA -> DFA
+crossUnion a' b' = let
     a = makeIndex a' 0
     b = makeIndex b' (S.size $ states a)
-    transitions = [ (from, c, to) |
+    transitions = [ (from, c, to) | -- Union using Cartesian Product
         c <- alphabet a <> alphabet b,
         x <- states a <> pure Empty,
         y <- states b <> pure Empty,
@@ -145,6 +146,3 @@ union a' b' = let
         S.member x (acceptStates a) || S.member y (acceptStates b)
         ]
     in build (transitions, initial, accepts)
-
-unions :: [DFA] -> DFA
-unions = mconcat

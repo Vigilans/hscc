@@ -121,7 +121,7 @@ spec = do
         it "should be equal to hard-coded dfa" $
             makeIndex dfa 0 `shouldBe` indexDFA
 
-    describe "DFA Union - State and Property" $ do
+    describe "DFA Cross Union - State and Property" $ do
         it "should stay the same when union with Empty state" $
             S.map (Empty <>) allStates `shouldBe` allStates
         it "A <> X -> State [1, 2, 3, 4] [\"test\", \"union\"]" $
@@ -131,23 +131,23 @@ spec = do
         it "A <> Z -> State [1, 2, 3, 4, 5, 6] [\"test\", \"union\", \"more\"]" $
             sA <> sZ `shouldBe` state [1, 2, 3, 4, 5, 6] ["test", "union", "more"]
         it "should stay the same when union with empty dfa" $
-            makeIndex (dfa <> empty) 0 `shouldBe` makeIndex dfa 0
+            makeIndex (dfa `crossUnion` empty) 0 `shouldBe` makeIndex dfa 0
 
-    describe "DFA Union - Equal to Hard-Code" $ do
+    describe "DFA Cross Union - Equal to Hard-Code" $ do
         it "Equality: initialState" $
-            initialState (dfa <> dfa') `shouldBe` initialState unionDFA
+            initialState (dfa `crossUnion` dfa') `shouldBe` initialState unionDFA
         it "Equality: acceptStates" $
-            acceptStates (dfa <> dfa') `shouldBe` acceptStates unionDFA
+            acceptStates (dfa `crossUnion` dfa') `shouldBe` acceptStates unionDFA
         it "Equality: alphabet" $
-            alphabet (dfa <> dfa') `shouldBe` alphabet unionDFA
+            alphabet (dfa `crossUnion` dfa') `shouldBe` alphabet unionDFA
         it "Equality: states" $
-            states (dfa <> dfa') `shouldBe` states unionDFA
+            states (dfa `crossUnion` dfa') `shouldBe` states unionDFA
         it "Equality: transTable" $
-            transTable (dfa <> dfa') `shouldBe` transTable unionDFA
+            transTable (dfa `crossUnion` dfa') `shouldBe` transTable unionDFA
         it "Equality: ensembled DFA" $
-            dfa <> dfa' `shouldBe` unionDFA
+            (dfa `crossUnion` dfa') `shouldBe` unionDFA
 
-    describe "DFA Union - ((a|b)*abb)|(1|(ε|(a|11)a)((a|11)a)*(1|ε|(a|11)a)|ε|(a|11)a)" $ do
+    describe "DFA Cross Union - ((a|b)*abb)|(1|(ε|(a|11)a)((a|11)a)*(1|ε|(a|11)a)|ε|(a|11)a)" $ do
         it "should accept \"abaabb\" to [\"test\"]" $
             run unionDFA "abaabb" `shouldBe` ["test"]
         it "should accept \"aaaa\" to [\"test\", \"union\"]" $
