@@ -27,9 +27,9 @@ parseLexer = do
     userDefs <- betweenStrMany "%{" "%}" anyChar
     updateState $ \lexer -> lexer { userDefs }
     -- Parse Regex Definitions
-    manyTill (trim <|> parseRegexDef) (string "%%")
+    manyTill (try trim <|> parseRegexDef) (string "%%")
     -- Parse Regex & Actions
-    manyTill (trim <|> parseRegexAct) (string "%%")
+    manyTill (try trim <|> parseRegexAct) (string "%%")
     -- Parse User Code
     userCode <- manyTill anyChar eof
     updateState $ \lexer -> lexer { userCode }
@@ -40,7 +40,7 @@ parseRegexDef :: GenParser Char Lexer ()
 parseRegexDef = do
     Lexer { regexDef } <- getState
     name  <- manyTill anyChar space
-    _     <- trim
+    _     <- many trim
     regex <- parseRegex regexDef
     updateState $ \lexer -> lexer {
         regexDef = M.insert name regex regexDef
@@ -51,15 +51,15 @@ parseRegexAct = do
     Lexer { regexDef } <- getState
     literal <- lookAhead $ manyTill anyChar space
     regex   <- parseRegex regexDef
-    _       <- trim
-    action  <- manyTill anyChar space
+    _       <- many trim
+    action  <- manyTill anyChar endOfLine
     updateState $ \lexer@Lexer { regexAct, regexDFA } -> lexer {
         regexAct = M.insert literal action regexAct,
         regexDFA = union regexDFA $ regex2dfa regex literal -- Use literal as tag
     }
 
 trim :: GenParser Char Lexer ()
-trim = void space <|> void comment -- Trim spaces and comments
+trim = try (void space) <|> void comment -- Trim spaces and comments
 
 comment :: GenParser Char Lexer String
 comment = betweenStrMany "/*" "*/" anyChar
@@ -77,6 +77,6 @@ stripR x = reverse . stripL x . reverse
 strip :: String -> String -> String
 strip x = stripL x . stripR x
 
-runLexer = case runParser parseLexer (Lexer {}) "" lexFileInput of
+runLexer = case runParser parseLexer (Lexer "" M.empty M.empty empty "") "" lexFileInput of
     Left err -> error $ show err
     Right lexer -> lexer

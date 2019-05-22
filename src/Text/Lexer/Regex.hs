@@ -57,7 +57,7 @@ parseRegex symbolTable = regex where
     any       = char '.' >> return (unionChars charset)
     epsilon   = char 'ε' >> return Epsilon
     symbol    = character >>= return . Symbol
-    character = try meta <|> try escape <|> oneOf (charset \\ metaChars)
+    character = try meta <|> try escape <|> oneOf (charset \\ (metaChars <> unescapeChars))
     meta      = char '\\' *> oneOf metaChars -- try meta first, or \\* will be parsed into Closure (Symbol '\\')
     escape    = char '\\' *> oneOf escapeChars >>= return . unescape
     set       = try negSet <|> posSet
@@ -79,6 +79,9 @@ escapeMap = M.fromList [('n', '\n'), ('t', '\t'), ('v', '\v'), ('f', '\f')]
 
 escapeChars :: [Char]
 escapeChars = M.keys escapeMap
+
+unescapeChars :: [Char]
+unescapeChars = M.elems escapeMap
 
 unescape :: Char -> Char
 unescape = (escapeMap !)
