@@ -2,6 +2,7 @@ module Text.Lexer.DFA.Array where
 
 import qualified Text.Lexer.DFA as DFA
 import qualified Data.Array as A
+import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set.Monad as S
 import Data.Array ((!))
@@ -21,7 +22,7 @@ data ArrayDFA = ArrayDFA {
     encoder    :: A.Array Condition Int,
     transTable :: A.Array (State, Int) State,
     tagsTable  :: A.Array State [Tag]
-} deriving (Read, Show)
+} deriving (Eq, Read, Show)
 
 encode :: ArrayDFA -> Condition -> Int
 encode dfa c = encoder dfa ! c
@@ -64,3 +65,21 @@ run dfa input = go (initState dfa) input [] where
     go x (c:cs) ts = case trans dfa x c of
         0 -> ts
         y -> go y cs (if accept dfa y then tags dfa y else ts)
+
+showDFA :: ArrayDFA -> String
+showDFA ArrayDFA { initState, encoder, transTable, tagsTable } = let
+    validChars = [(c, a) | (c, a) <- A.assocs encoder, a /= 0]
+    acceptTags = [(s, t) | (s, t) <- A.assocs tagsTable, t /= []]
+    maxDigits = length . show . A.rangeSize . A.bounds $ tagsTable
+    padding x = replicate (maxDigits - length x) ' ' ++ x
+    prepend x acc = concat [padding x, " ", acc]
+    (rows, cols) = snd $ A.bounds transTable
+    in L.intercalate "\n" [
+        "ArrayDFA {",
+        "initState  = " ++ show initState,
+        "encoder    = " ++ show validChars,
+        "tagsTable  = " ++ show acceptTags,
+        "transTable = ",
+        foldr1 prepend $ " " : map (pure . fst) validChars,
+        L.intercalate "\n" [foldr1 prepend $ show r : [if s /= 0 then show s else " " | c <- [1..cols], let s = transTable ! (r, c) ] | r <- [1..rows]],
+        "}"]
