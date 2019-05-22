@@ -48,8 +48,8 @@ regexFunction re = runState (run re) (RegexPose M.empty M.empty) where
         }
         return RegexAttr {
             nullable = nullable c1 && nullable c2,
-            firstpos = firstpos c1 <> join [firstpos c2 | nullable c1],
-            lastpos  = lastpos  c2 <> join [lastpos  c1 | nullable c2]
+            firstpos = firstpos c1 <> if nullable c1 then firstpos c2 else mempty,
+            lastpos  = lastpos  c2 <> if nullable c2 then lastpos  c1 else mempty
         }
     run n@(Closure c') = do
         c <- run c'
@@ -83,8 +83,8 @@ data RegexToDFAState = R2DS {
 augment :: Regex -> Regex
 augment r = Concat r Endmark
 
-regex2dfa :: Regex -> DFA.Tag -> DFA.DFA
-regex2dfa reg tag = let
+regex2dfa :: DFA.Tag -> Regex -> DFA.DFA
+regex2dfa tag reg = let
     -- Augment regex with '#'
     aug = augment reg
     -- Compute regex functions

@@ -36,6 +36,7 @@ spec :: Spec
 spec = do
     let (RegexAttr{ nullable, firstpos, lastpos }, RegexPose{ followpos, leafsymb }) = regexFunction regex'
     describe "Regex Functions" $ do
+
         it "augmented regex is ((a|b))*abb#" $
             showRegex regex' `shouldBe` "((a|b))*abb#"
         it "nullable, firstpos, lastpos are False, {1,2,3}, {6}" $
@@ -47,4 +48,4 @@ spec = do
 
     describe "Regex to DFA" $
         it "should be equal to hard-coded dfa" $
-            regex2dfa regex "regex" `shouldBe` regexDFA
+            regex2dfa "regex" regex `shouldBe` regexDFA

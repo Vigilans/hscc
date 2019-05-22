@@ -55,7 +55,7 @@ parseRegexAct = do
     action  <- manyTill anyChar endOfLine
     updateState $ \lexer@Lexer { regexAct, regexDFA } -> lexer {
         regexAct = M.insert literal action regexAct,
-        regexDFA = union regexDFA $ regex2dfa regex literal -- Use literal as tag
+        regexDFA = regex2dfa literal regex <> regexDFA -- Use literal as tag
     }
 
 trim :: GenParser Char Lexer ()
@@ -64,18 +64,7 @@ trim = try (void space) <|> void comment -- Trim spaces and comments
 comment :: GenParser Char Lexer String
 comment = betweenStrMany "/*" "*/" anyChar
 
-input = "a|b|c"
-
 lexFileInput = "  \n\t\n%{\n\n#include <stdio.h>\naaa\n%}\nD\t[0-9]\nA\t[1-3]*\n%%\nauto\t{ printf(\"AUTO\"); }\ncase\t{ printf(\"CASE\"); }\n{D}\t{ printf(\"IDENTIFIER\"); }\n%%\nmain() {\tyylex();\n}"
-
-stripL :: String -> String -> String
-stripL x = dropWhile (`elem` x)
-
-stripR :: String -> String -> String
-stripR x = reverse . stripL x . reverse
-
-strip :: String -> String -> String
-strip x = stripL x . stripR x
 
 runLexer = case runParser parseLexer (Lexer "" M.empty M.empty empty "") "" lexFileInput of
     Left err -> error $ show err
