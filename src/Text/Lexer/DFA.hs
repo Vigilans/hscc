@@ -51,7 +51,7 @@ empty :: DFA
 empty = DFA S.empty S.empty Empty S.empty M.empty
 
 instance Semigroup DFA where
-    a <> b = minimize . reduction $ crossUnion a b
+    a <> b = eliminateDeads . minimize . reduction $ crossUnion a b
 
 instance Monoid DFA where
     mempty = empty
@@ -124,6 +124,14 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     -- Get representative state (it must exists)
     repState :: State -> State
     repState s = fromJust $ S.findMin <$> L.find (s `S.member`) finalPartition
+
+eliminateDeads :: DFA -> DFA
+eliminateDeads dfa@ DFA { alphabet, states } = let
+    -- Dead state is one that not accepting and transfers to itself or on each input symbol
+    isDead s = not (accept dfa s) && (trans dfa s <$> alphabet) `S.isSubsetOf` S.fromList [s, Empty]
+    deadStates = S.filter isDead states
+    eliminated = mapStates (\s -> if s `S.member` deadStates then Empty else s) dfa
+    in if null deadStates then dfa else eliminateDeads eliminated -- Recursive apply until no more dead state
 
 makeIndex :: DFA -> Int -> DFA
 makeIndex dfa offset = mapStates (\s -> s { code = S.singleton (getIndex s + offset) }) dfa
