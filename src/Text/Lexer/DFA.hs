@@ -12,7 +12,7 @@ import Control.Monad
 data State = Empty | State {
     code :: S.Set Int,
     tags :: [Tag]
-} deriving (Eq, Ord, Read, Show)
+} deriving (Eq, Ord)
 
 instance Semigroup State where
     Empty <> b = b
@@ -21,6 +21,13 @@ instance Semigroup State where
 
 instance Monoid State where
     mempty = Empty
+
+instance Show State where
+    show Empty = "<.>"
+    show (State c ts) = let
+        code' = L.intercalate "," (show <$> S.toList c)
+        tags' = ";<" ++ L.intercalate "," ts ++ ">"
+        in "<" ++ code' ++ (if null ts then "" else tags') ++ ">"
 
 type Tag = String
 type Condition  = Char
@@ -32,7 +39,7 @@ data DFA = DFA {
     initialState :: State,
     acceptStates :: S.Set State,
     transTable   :: M.Map (State, Condition) State
-} deriving (Eq, Read, Show)
+} deriving (Eq, Show)
 
 trans :: DFA -> State -> Condition -> State
 trans dfa s c = fromMaybe Empty $ transTable dfa !? (s, c)
@@ -72,14 +79,6 @@ test dfa = accept dfa . foldl (trans dfa) (initialState dfa)
 type Group = S.Set State
 type Partition = [Group]
 
-partition :: DFA -> Partition -> Partition
-partition dfa = run [] where
-    run front [] = front
-    run front (group:back) = run (front ++ subgroups) back where
-        mapper s = trans dfa s <$> alphabet dfa
-        folder s = M.insertWith (<>) (mapper s) (pure s)
-        subgroups = M.elems $ S.foldr folder M.empty group
-
 mapStates :: (State -> State) -> DFA -> DFA
 mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable } = let
     f' s = if s /= Empty then f s else Empty
@@ -88,6 +87,30 @@ mapStates f dfa@DFA { alphabet, states, initialState, acceptStates, transTable }
     mapAlphabet s = [(f' s, c, f' s') | c <- alphabet, let s' = trans dfa s c, f' s' /= Empty]
     transitions   = join $ S.map mapAlphabet states
     in build (transitions, initialState', acceptStates')
+
+reduction :: DFA -> DFA
+reduction dfa@DFA { alphabet, initialState } = let
+    -- Map state to its neighbor to-states
+    mapTrans :: State -> S.Set State
+    mapTrans s = fmap (trans dfa s) alphabet \\ pure Empty
+    -- DFS graph traversal to get visited states
+    dfs :: [State] -> S.Set State -> S.Set State
+    dfs [] visited = visited
+    dfs (s:ss) visited = let
+        children = S.toList $ mapTrans s \\ visited
+        in dfs (children ++ ss) (S.insert s visited)
+    -- Get reachable states from initial state
+    reachables = dfs [initialState] S.empty
+    -- Reduce all the states that's not reachable from initial state
+    in mapStates (\s -> if s `S.member` reachables then s else Empty) dfa
+
+partition :: DFA -> Partition -> Partition
+partition dfa = run [] where
+    run front [] = front
+    run front (group:back) = run (front ++ subgroups) back where
+        mapper s = trans dfa s <$> alphabet dfa
+        folder s = M.insertWith (<>) (mapper s) (pure s)
+        subgroups = M.elems $ S.foldr folder M.empty group
 
 minimize :: DFA -> DFA
 minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where

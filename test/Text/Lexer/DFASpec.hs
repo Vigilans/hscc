@@ -196,7 +196,7 @@ u0Y = sY { code = S.singleton 5 };
 u0Z = sZ { code = S.singleton 7 };
 {- u00 = Empty -} -- Not used
 
--- We could see that some states will never reached here.
+-- We could see that some states will never be reached here.
 -- TODO: when the performance problem occurs, consider optimize the logic here.
 unionDFA = DFA {
     alphabet = S.fromList ['a', 'b', '1'],
