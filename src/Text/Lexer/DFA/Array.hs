@@ -59,12 +59,16 @@ build dfa' = let
         ]
     in ArrayDFA { initState, encoder, transTable, tagsTable }
 
-run :: ArrayDFA -> [Condition] -> [Tag]
-run dfa input = go (initState dfa) input [] where
-    go _ [] ts = ts
-    go x (c:cs) ts = case trans dfa x c of
-        0 -> ts
-        y -> go y cs (if accept dfa y then tags dfa y else ts)
+run :: ArrayDFA -> [Condition] -> ([Tag], ([Condition], [Condition]))
+run dfa input = forward (initState dfa) [initState dfa] input where
+    forward _ ss [] = backtrack ss
+    forward x ss (c:cs) = case trans dfa x c of
+        0 -> backtrack ss
+        y -> forward y (y:ss) cs
+    backtrack [] = ([], ([], input))
+    backtrack (s:ss) = case accept dfa s of
+        True  -> (tags dfa s, splitAt (length ss) input)
+        False -> backtrack ss
 
 showDFA :: ArrayDFA -> String
 showDFA ArrayDFA { initState, encoder, transTable, tagsTable } = let

@@ -65,13 +65,16 @@ build (transitions, initialState, acceptStates) = let
         )) (S.empty, S.empty, M.empty) transitions
     in DFA { alphabet, states, initialState, acceptStates, transTable }
 
-run :: DFA -> [Condition] -> [Tag]
-run dfa@DFA { initialState } input = go initialState input initTags where
-    initTags = if accept dfa initialState then tags initialState else []
-    go _ [] ts = ts
-    go x (c:cs) ts = case trans dfa x c of
-        Empty -> ts
-        y -> go y cs (if accept dfa y then tags y else ts)
+run :: DFA -> [Condition] -> ([Tag], ([Condition], [Condition]))
+run dfa input = forward (initialState dfa) [initialState dfa] input where
+    forward _ ss [] = backtrack ss
+    forward x ss (c:cs) = case trans dfa x c of
+        Empty -> backtrack ss
+        y -> forward y (y:ss) cs
+    backtrack [] = ([], ([], input))
+    backtrack (s:ss) = case accept dfa s of
+        True  -> (tags s, splitAt (length ss) input)
+        False -> backtrack ss
 
 test :: DFA -> [Condition] -> Bool
 test dfa = accept dfa . foldl (trans dfa) (initialState dfa)

@@ -82,11 +82,11 @@ spec = do
         it "should only accept E" $
             accept dfa <$> [sA, sB, sC, sD, sE] `shouldBe` [False, False, False, False, True]
         it "should accept \"abaabb\"" $
-            run dfa "abaabb" `shouldBe` ["test"]
+            run dfa "abaabb" `shouldBe` (["test"], ("abaabb", ""))
         it "should not accept \"abaab\"" $
-            run dfa "abaab" `shouldBe` []
+            run dfa "abaab" `shouldBe` ([], ("", "abaab"))
         it "should accept \"abbaab\"" $
-            run dfa "abbaab" `shouldBe` ["test"]
+            run dfa "abbaab" `shouldBe` (["test"], ("abb", "aab"))
 
     describe "DFA Mapping States" $ do
         it "should stay the same when mapped by id" $
@@ -149,15 +149,15 @@ spec = do
 
     describe "DFA Cross Union - ((a|b)*abb)|(1|(ε|(a|11)a)((a|11)a)*(1|ε|(a|11)a)|ε|(a|11)a)" $ do
         it "should accept \"abaabb\" to [\"test\"]" $
-            run unionDFA "abaabb" `shouldBe` ["test"]
+            run unionDFA "abaabb" `shouldBe` (["test"], ("abaabb", ""))
         it "should accept \"aaaa\" to [\"test\", \"union\"]" $
-            run unionDFA "aaaa" `shouldBe` ["test", "union"]
+            run unionDFA "aaaa" `shouldBe` (["test", "union"], ("aaaa", ""))
         it "should accept \"11aaa1\" to [\"union\", \"more\"]" $
-            run unionDFA "11aaa1" `shouldBe` ["union", "more"]
+            run unionDFA "11aaa1" `shouldBe` (["union", "more"], ("11aaa1", ""))
         it "should not accept \"aaaaa\"" $
             test unionDFA "aaaaa" `shouldBe` False
         it "should accept \"\" to [\"test\", \"union\"]" $
-            run unionDFA "" `shouldBe` ["test", "union"]
+            run unionDFA "" `shouldBe` (["test", "union"], ("", ""))
 
     describe "DFA Reduction" $ do
         it "should even delete the accept state when applied on dfa with B deleted" $
