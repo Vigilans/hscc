@@ -51,7 +51,7 @@ empty :: DFA
 empty = DFA S.empty S.empty Empty S.empty M.empty
 
 instance Semigroup DFA where
-    a <> b = eliminateDeads . minimize . reduction $ crossUnion a b
+    a <> b = {-eliminateDeads.-} minimize . reduction $ crossUnion a b
 
 instance Monoid DFA where
     mempty = empty
@@ -119,8 +119,11 @@ minimize dfa@DFA { states, acceptStates } = mapStates repState dfa where
     -- Split until partition can be no more fine
     atomicSplit :: Partition -> Partition
     atomicSplit cur = if cur == new then cur else atomicSplit new where new = partition dfa cur
-    -- Get final partition (initial partition contains: F, S - F, and {Empty})
-    finalPartition = atomicSplit [acceptStates, states \\ acceptStates, pure Empty]
+    {- Get final partition. There are two initial partition chocies:
+       - F, S - F, and {Empty}: This will not eliminate the dead state.
+       - F, {Empty} ∪ (S - F): This will eliminate the dead state, as Empty is the smallest state,
+         and will be chosen as reprentative state in the dead state group. -}
+    finalPartition = atomicSplit [acceptStates, pure Empty <> states \\ acceptStates]
     -- Get representative state (it must exists)
     repState :: State -> State
     repState s = fromJust $ S.findMin <$> L.find (s `S.member`) finalPartition
