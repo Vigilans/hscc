@@ -1,26 +1,67 @@
-module Text.Lexer (
-    parseLexer
-) where
+module Text.Lexer where
 
 import qualified Data.Map as M
-import Text.ParserCombinators.Parsec
-import Text.Parsec.Char
-import Text.Lexer.DFA
-import Text.Lexer.DFA.Regex
+import qualified Control.Monad.State as MS
 import Text.Lexer.Regex
-import Control.Monad
+import Text.Lexer.DFA (DFA, Tag)
+import Text.Lexer.DFA.Regex
+import Text.Lexer.DFA.Array as DFA hiding (State)
+import Text.ParserCombinators.Parsec hiding (State)
+import Text.Parsec.Char
+import Control.Monad.State hiding (State)
+import Data.Map ((!))
 
-type Action = String
+type Token = String
 
-data Lexer = Lexer {
+data State u = State {
+    yystate :: u,
+    yyinput :: String,
+    yytoken :: Token
+}
+
+fromInputState :: (String, u) -> State u
+fromInputState (i, s) = State { yyinput = i, yystate = s, yytoken = "" }
+
+toInputState :: State u -> (String, u)
+toInputState State{..} = (yyinput, yystate)
+
+type Action s a = MS.State (State s) (Maybe a) -- An action may returns nothing
+
+data Lexer s a = Lexer {
+    dfa :: ArrayDFA,
+    actions :: M.Map Tag (Action s a)
+}
+
+runLexer :: Lexer s a -> String -> s -> (a, (String ,s))
+runLexer Lexer{..} input state = let
+    run = do
+        input <- gets yyinput
+        let (match : _, (token, rest)) = DFA.run dfa input
+        modify $ \s -> s { yytoken = token, yyinput = rest }
+        actions ! match >>= \case
+            Nothing -> run
+            Just a  -> return a
+    in toInputState <$> runState run (fromInputState (input, state))
+
+
+buildLexer :: (String, String) -> Lexer s a
+buildLexer (filename, text) = let
+    rawLexer = case runParser parseLexer (RawLexer "" mempty mempty mempty "") filename text of
+        Left err -> error $ show err
+        Right lexer -> lexer
+    in Lexer {  }
+
+{- -------- Lexer metadata by parsing raw text -------- -}
+
+data RawLexer = RawLexer {
     userDefs :: String,
     regexDef :: M.Map String Regex,  -- RE name to Regex
-    regexAct :: M.Map String Action, -- RE literal to Action
+    regexAct :: M.Map String String, -- RE literal to Action
     regexDFA :: DFA,
     userCode :: String
 } deriving (Show)
 
-parseLexer :: GenParser Char Lexer Lexer
+parseLexer :: GenParser Char RawLexer RawLexer
 parseLexer = do
     skipMany trim
     -- Parse Definition Section
@@ -36,9 +77,9 @@ parseLexer = do
     -- Return final state
     getState
 
-parseRegexDef :: GenParser Char Lexer ()
+parseRegexDef :: GenParser Char RawLexer ()
 parseRegexDef = do
-    Lexer { regexDef } <- getState
+    RawLexer { regexDef } <- getState
     name  <- manyTill anyChar space
     _     <- many trim
     regex <- parseRegex regexDef
@@ -46,26 +87,20 @@ parseRegexDef = do
         regexDef = M.insert name regex regexDef
     }
 
-parseRegexAct :: GenParser Char Lexer ()
+parseRegexAct :: GenParser Char RawLexer ()
 parseRegexAct = do
-    Lexer { regexDef } <- getState
+    RawLexer { regexDef } <- getState
     literal <- lookAhead $ manyTill anyChar space
     regex   <- parseRegex regexDef
     _       <- many trim
     action  <- manyTill anyChar endOfLine
-    updateState $ \lexer@Lexer { regexAct, regexDFA } -> lexer {
+    updateState $ \lexer@RawLexer { regexAct, regexDFA } -> lexer {
         regexAct = M.insert literal action regexAct,
         regexDFA = regex2dfa literal regex <> regexDFA -- Use literal as tag
     }
 
-trim :: GenParser Char Lexer ()
+trim :: GenParser Char st ()
 trim = try (void space) <|> void comment -- Trim spaces and comments
 
-comment :: GenParser Char Lexer String
+comment :: GenParser Char st String
 comment = betweenStrMany "/*" "*/" anyChar
-
-lexFileInput = "  \n\t\n%{\n\n#include <stdio.h>\naaa\n%}\nD\t[0-9]\nA\t[1-3]*\n%%\nauto\t{ printf(\"AUTO\"); }\ncase\t{ printf(\"CASE\"); }\n{D}\t{ printf(\"IDENTIFIER\"); }\n%%\nmain() {\tyylex();\n}"
-
-runLexer = case runParser parseLexer (Lexer "" M.empty M.empty empty "") "" lexFileInput of
-    Left err -> error $ show err
-    Right lexer -> lexer

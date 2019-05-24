@@ -35,6 +35,8 @@ default-extensions:
 - FlexibleContexts
 - NamedFieldPuns
 - TupleSections
+- LambdaCase
+- RecordWildCards
 
 library:
   source-dirs: src
