@@ -1,11 +1,16 @@
 module Main where
 
 import System.IO
+import System.Environment
+import Text.Lexer
 
 main :: IO ()
 main = do
-    inh <- openFile "./test.l" ReadMode
-    inpStr <- hGetContents inh
-    putStr inpStr
-    hClose inh
-    return ()
+    [target] <- getArgs
+    let iFile = target ++ ".l"
+    let oFile = target ++ ".hs"
+    input <- readFile iFile
+    putStrLn "Successfully read grammar file. Converting it to lexer..."
+    let lexer = buildLexer (iFile, input)
+    writeFile oFile lexer
+    putStrLn $ "Successfully dumped lexer file to " ++ oFile ++ "."

@@ -1,9 +1,10 @@
 module Text.Lexer where
 
+import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Control.Monad.State as MS
 import Text.Lexer.Regex
-import Text.Lexer.DFA (DFA, Tag)
+import Text.Lexer.DFA (DFA, Tag, minimize)
 import Text.Lexer.DFA.Regex
 import Text.Lexer.DFA.Array as DFA hiding (State)
 import Text.ParserCombinators.Parsec hiding (State)
@@ -38,18 +39,31 @@ runLexer Lexer{..} input state = let
         input <- gets yyinput
         let (match : _, (token, rest)) = DFA.run dfa input
         modify $ \s -> s { yytoken = token, yyinput = rest }
-        actions ! match >>= \case
+        actions ! (match) >>= \case
             Nothing -> run
             Just a  -> return a
     in toInputState <$> runState run (fromInputState (input, state))
 
-
-buildLexer :: (String, String) -> Lexer s a
+buildLexer :: (String, String) -> String
 buildLexer (filename, text) = let
-    rawLexer = case runParser parseLexer (RawLexer "" mempty mempty mempty "") filename text of
+    RawLexer{..} = case runParser parseLexer (RawLexer "" mempty mempty mempty "") filename text of
         Left err -> error $ show err
         Right lexer -> lexer
-    in Lexer {  }
+    actions = M.map ("get >>= \\State {..} -> do " ++) regexAct
+    tagActs = L.intercalate "," ["(" ++ show tag ++ "," ++ act ++ ")" | (tag, act) <- M.assocs actions]
+    in L.intercalate "\n" [
+        "import Text.Lexer (Lexer(..), State(..), runLexer)",
+        "import Text.Lexer.DFA.Array (ArrayDFA(..))",
+        "import Control.Monad.State hiding (State)",
+        "import Data.Array (array)",
+        "import Data.Map (fromList)",
+        userDefs,
+        "lexer :: Lexer s a",
+        "lexer = Lexer {",
+        "    dfa = " ++ show (DFA.build . minimize $ regexDFA) ++ ",",
+        "    actions = fromList [" ++ tagActs ++ "]",
+        "}",
+        userCode]
 
 {- -------- Lexer metadata by parsing raw text -------- -}
 
@@ -68,9 +82,9 @@ parseLexer = do
     userDefs <- betweenStrMany "%{" "%}" anyChar
     updateState $ \lexer -> lexer { userDefs }
     -- Parse Regex Definitions
-    manyTill (try trim <|> parseRegexDef) (string "%%")
+    manyTill (try trim <|> parseRegexDef) (try $ string "%%")
     -- Parse Regex & Actions
-    manyTill (try trim <|> parseRegexAct) (string "%%")
+    manyTill (try trim <|> parseRegexAct) (try $ string "%%")
     -- Parse User Code
     userCode <- manyTill anyChar eof
     updateState $ \lexer -> lexer { userCode }
@@ -96,7 +110,7 @@ parseRegexAct = do
     action  <- manyTill anyChar endOfLine
     updateState $ \lexer@RawLexer { regexAct, regexDFA } -> lexer {
         regexAct = M.insert literal action regexAct,
-        regexDFA = regex2dfa literal regex <> regexDFA -- Use literal as tag
+        regexDFA = regexDFA <> regex2dfa literal regex -- Use literal as tag, must preserve order
     }
 
 trim :: GenParser Char st ()

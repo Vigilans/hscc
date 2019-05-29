@@ -1,5 +1,5 @@
 %{
-#include <stdio.h>
+import Debug.Trace
 %}
 D			[0-9]
 L			[a-zA-Z_]
@@ -44,18 +44,14 @@ volatile		{ printf("VOLATILE"); }
 while			{ printf("WHILE"); }
 >>=			{ printf("RIGHT_ASSIGN"); }
 <<=			{ printf("LEFT_ASSIGN"); }
-\+=			{ printf("ADD_ASSIGN"); }
++=			{ printf("ADD_ASSIGN"); }
 -=			{ printf("SUB_ASSIGN"); }
-\*=			{ printf("MUL_ASSIGN"); }
+*=			{ printf("MUL_ASSIGN"); }
 /=			{ printf("DIV_ASSIGN"); }
 %=			{ printf("MOD_ASSIGN"); }
 &=			{ printf("AND_ASSIGN"); }
 {L}({L}|{D})*		{ printf("IDENTIFIER"); }
 {D}*.{D}+{E}?{FS}?	{ printf("CONSTANT"); }
 {D}+.{D}*{E}?{FS}?	{ printf("CONSTANT"); }
-
 %%
-
-main() {
-    yylex();
-}
+printf (str) = trace str $ return Nothing

@@ -51,7 +51,7 @@ empty :: DFA
 empty = DFA S.empty S.empty Empty S.empty M.empty
 
 instance Semigroup DFA where
-    a <> b = {-eliminateDeads.-} minimize . reduction $ crossUnion a b
+    a <> b = {-eliminateDeads. minimize . -}reduction $ crossUnion a b
 
 instance Monoid DFA where
     mempty = empty
