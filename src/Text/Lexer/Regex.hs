@@ -65,8 +65,8 @@ parseRegex symbolTable = regex where
     negSet    = betweenStrOne "[^" "]" setItems >>= return . unionChars . (charset \\)
     setItems  = setItem `chainl1` return L.union
     setItem   = try (return <$> setMeta) <|> try range <|> (return <$> setChar)
-    setMeta   = char '\\' *> oneOf ['-', ']']
-    setChar   = oneOf (charset \\ ([']'] <> unescapeChars))
+    setMeta   = char '\\' *> oneOf ['-', ']', '\\']
+    setChar   = try escape <|> try (char '\\' *> oneOf charset) <|> oneOf (charset \\ [']'])
     range     = enumFromTo <$> character <* char '-' <*> character
 
 charset :: [Char]

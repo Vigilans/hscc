@@ -169,6 +169,13 @@ spec = do
         it "should be equal to cross union followed with reduction" $
             dfsUnions [dfa, dfa'] `shouldBe` reduction (crossUnion dfa dfa')
 
+    describe "DFA Eliminating Dead States" $ do
+        it "should eliminate states that cannot lead to accept state" $
+            let dfaDelB' = dfaDelB { acceptStates = pure sA } in
+            eliminateDeads dfaDelB' `shouldBe` mapStates (\s -> if s == sA then s else Empty) dfaDelB'
+        it "should reduce dfa with no accept states and circular transition to empty" $
+            eliminateDeads dfaDelB { acceptStates = S.empty } `shouldBe` empty
+
 {- ------- Stuff for DFA minimize ------- -}
 minDFA = DFA {
     alphabet = charset,

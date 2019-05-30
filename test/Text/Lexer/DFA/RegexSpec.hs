@@ -50,3 +50,6 @@ spec = do
             regex2dfa "regex" regex `shouldBe` regexDFA
         it "should be minimum dfa in this example" $
             regex2dfa "regex" regex `shouldBe` minimize (regex2dfa "regex" regex)
+        it "state of empty code should be the dead state" $
+            let dfa = regex2dfa "auto" (readRegex "auto") in
+            eliminateDeads dfa `shouldBe` mapStates (\s -> if S.null $ code s then Empty else s) dfa

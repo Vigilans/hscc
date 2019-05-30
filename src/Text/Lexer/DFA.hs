@@ -62,11 +62,11 @@ instance Monoid DFA where
 build :: (S.Set Transition, State, S.Set State) -> DFA
 build (transitions, initialState, acceptStates) = let
     (alphabet, states, transTable) = S.foldl (\(conds, states, table) (from, cond, to) -> (
-            S.insert cond conds,
-            foldr S.insert states [from, to],
+            conds  <> pure cond,
+            states <> pure from <> pure to,
             M.insert (from, cond) to table
-        )) (S.empty, S.empty, M.empty) transitions
-    in DFA { alphabet, states, initialState, acceptStates, transTable }
+        )) (S.empty, acceptStates <> pure initialState, M.empty) transitions
+    in DFA alphabet (states \\ pure Empty) initialState acceptStates transTable
 
 run :: DFA -> [Condition] -> ([Tag], ([Condition], [Condition]))
 run dfa input = forward (initialState dfa) [initialState dfa] input where
@@ -112,7 +112,7 @@ reduction dfa@DFA { alphabet, initialState } = let
 
 eliminateDeads :: DFA -> DFA
 eliminateDeads dfa@ DFA { alphabet, states } = let
-    -- Dead state is one that not accepting and transfers to itself or on each input symbol
+    -- Dead state is one that not accepting and transfers to itself on each input symbol
     isDead s = not (accept dfa s) && (trans dfa s <$> alphabet) `S.isSubsetOf` S.fromList [s, Empty]
     deadStates = S.filter isDead states
     eliminated = mapStates (\s -> if s `S.member` deadStates then Empty else s) dfa
