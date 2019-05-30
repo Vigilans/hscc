@@ -4,7 +4,7 @@ import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Control.Monad.State as MS
 import Text.Lexer.Regex
-import Text.Lexer.DFA (DFA, Tag, minimize)
+import Text.Lexer.DFA (DFA, Tag, minimize, eliminateDeads)
 import Text.Lexer.DFA.Regex
 import Text.Lexer.DFA.Array as DFA hiding (State)
 import Text.ParserCombinators.Parsec hiding (State)
@@ -60,7 +60,7 @@ buildLexer (filename, text) = let
         userDefs,
         "lexer :: Lexer s a",
         "lexer = Lexer {",
-        "    dfa = " ++ show (DFA.build . minimize $ regexDFA) ++ ",",
+        "    dfa = " ++ show (DFA.build . minimize . eliminateDeads . mconcat $ regexDFA) ++ ",",
         "    actions = fromList [" ++ tagActs ++ "]",
         "}",
         userCode]
@@ -71,7 +71,7 @@ data RawLexer = RawLexer {
     userDefs :: String,
     regexDef :: M.Map String Regex,  -- RE name to Regex
     regexAct :: M.Map String String, -- RE literal to Action
-    regexDFA :: DFA,
+    regexDFA :: [DFA],
     userCode :: String
 } deriving (Show)
 
@@ -110,7 +110,7 @@ parseRegexAct = do
     action  <- manyTill anyChar endOfLine
     updateState $ \lexer@RawLexer { regexAct, regexDFA } -> lexer {
         regexAct = M.insert literal action regexAct,
-        regexDFA = regexDFA <> regex2dfa literal regex -- Use literal as tag, must preserve order
+        regexDFA = regexDFA ++ [regex2dfa literal regex] -- Use literal as tag, must preserve order
     }
 
 trim :: GenParser Char st ()

@@ -44,9 +44,9 @@ volatile		{ printf("VOLATILE"); }
 while			{ printf("WHILE"); }
 >>=			{ printf("RIGHT_ASSIGN"); }
 <<=			{ printf("LEFT_ASSIGN"); }
-+=			{ printf("ADD_ASSIGN"); }
+\+=			{ printf("ADD_ASSIGN"); }
 -=			{ printf("SUB_ASSIGN"); }
-*=			{ printf("MUL_ASSIGN"); }
+\*=			{ printf("MUL_ASSIGN"); }
 /=			{ printf("DIV_ASSIGN"); }
 %=			{ printf("MOD_ASSIGN"); }
 &=			{ printf("AND_ASSIGN"); }
