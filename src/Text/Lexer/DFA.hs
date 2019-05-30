@@ -8,6 +8,7 @@ import Data.Map ((!), (!?))
 import Data.Set.Monad ((\\))
 import Data.Maybe
 import Control.Monad
+import Control.Monad.State hiding (State)
 
 data State = Empty | State {
     code :: S.Set Int,
@@ -160,3 +161,32 @@ crossUnion a' b' = let
         S.member x (acceptStates a) || S.member y (acceptStates b)
         ]
     in build (transitions, initial, accepts)
+
+dfsUnions :: [DFA] -> DFA
+dfsUnions dfas = let
+    -- Prepare invariants before union
+    inds  = scanl (\i dfa -> i + S.size (states dfa)) 0 dfas
+    dfas' = map (uncurry makeIndex) (zip dfas inds)
+    alphabet' = mconcat $ alphabet <$> dfas'
+    initState' = initialState <$> dfas'
+    -- Concurrently trans state tuple to a new state tuple
+    trans' :: [State] -> Condition -> [State]
+    trans' ss c = uncurry trans <$> zip dfas' ss <*> [c]
+    -- If any state in the state tuple is accepted, then accept the union state
+    accept' :: [State] -> Bool
+    accept' ss = or (uncurry accept <$> zip dfas' ss)
+    -- Concurrently DFS traversal to build union DFA
+    dfs [] = gets $ \(ts, as, _) -> build (ts, mconcat initState', as)
+    dfs (s:ss) = do
+        let u = mconcat s -- u is the unioned state of state tuple s
+        -- Get new transitions and children to traverse
+        (transis, children) <- gets $ \(_, _, visited) -> S.foldl (\(ts, cs) c ->
+            let s' = trans' s c; u' = mconcat s' in (
+                ts <> [(u, c, u') | u /= Empty && u' /= Empty],
+                cs <> [s' | u' `S.notMember` visited, u' /= Empty]
+            )) (S.empty, []) alphabet'
+        -- Modify the union DFA building state
+        modify $ \(ts, as, vs) -> (ts <> transis, as <> [u | accept' s], vs <> pure u)
+        -- Recursively traverse non-visited states
+        dfs (children ++ ss)
+    in evalState (dfs [initState']) (S.empty, S.empty, S.empty)

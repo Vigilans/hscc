@@ -165,6 +165,10 @@ spec = do
         it "should be equal to hard-coded reduced union dfa" $
             reduction unionDFA `shouldBe` unionDFA'
 
+    describe "DFA DFS Union" $
+        it "should be equal to cross union followed with reduction" $
+            dfsUnions [dfa, dfa'] `shouldBe` reduction (crossUnion dfa dfa')
+
 {- ------- Stuff for DFA minimize ------- -}
 minDFA = DFA {
     alphabet = charset,
