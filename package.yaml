@@ -37,6 +37,7 @@ default-extensions:
 - TupleSections
 - LambdaCase
 - RecordWildCards
+- ScopedTypeVariables
 
 library:
   source-dirs: src
