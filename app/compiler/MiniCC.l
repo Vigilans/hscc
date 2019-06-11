@@ -50,8 +50,55 @@ while			{ printf("WHILE"); }
 /=			{ printf("DIV_ASSIGN"); }
 %=			{ printf("MOD_ASSIGN"); }
 &=			{ printf("AND_ASSIGN"); }
+^=			{ printf("XOR_ASSIGN");  }
+\|=			{ printf("OR_ASSIGN");  }
+>>			{ printf("RIGHT_OP");  }
+<<			{ printf("LEFT_OP");  }
+\+\+			{ printf("INC_OP");  }
+--			{ printf("DEC_OP");  }
+->			{ printf("PTR_OP");  }
+&&			{ printf("AND_OP");  }
+\|\|			{ printf("OR_OP");  }
+<=			{ printf("LE_OP");  }
+>=			{ printf("GE_OP");  }
+==			{ printf("EQ_OP");  }
+!=			{ printf("NE_OP");  }
+;			{ printf(";");  }
+\{		{ printf("{");  }
+\}		{ printf("}");  }
+,			{ printf(",");  }
+:			{ printf(":");  }
+=			{ printf("=");  }
+\(			{ printf("(");  }
+\)			{ printf(")");  }
+\[		{ printf("[");  }
+\]		{ printf("]");  }
+\.			{ printf(".");  }
+&			{ printf("&");  }
+!			{ printf("!");  }
+~			{ printf("~");  }
+-			{ printf("-");  }
+\+			{ printf("+");  }
+\*			{ printf("*");  }
+/			{ printf("/");  }
+%			{ printf("%");  }
+<			{ printf("<");  }
+>			{ printf(">");  }
+^			{ printf("^");  }
+\|			{ printf("||");  }
+\?			{ printf("?");  }
 {L}({L}|{D})*		{ printf("IDENTIFIER"); }
-{D}*.{D}+{E}?{FS}?	{ printf("CONSTANT"); }
-{D}+.{D}*{E}?{FS}?	{ printf("CONSTANT"); }
+0[xX]{H}+{IS}?		{ printf("CONSTANT");  }
+0[0-7]*{IS}?		{ printf("CONSTANT");  }
+[1-9]{D}*{IS}?		{ printf("CONSTANT");  }
+{D}+{E}{FS}?		{ printf("CONSTANT");  }
+{D}*\.{D}+{E}?{FS}?	{ printf("CONSTANT"); }
+{D}+\.{D}*{E}?{FS}?	{ printf("CONSTANT"); }
+0[xX]{H}+{P}{FS}?	{ printf("CONSTANT");  }
+0[xX]{H}*\.{H}+{P}{FS}?		{ printf("CONSTANT");  }
+0[xX]{H}+\.{H}*{P}{FS}?		{ printf("CONSTANT");  }
+
+[ \t\v\n\f]		{ printf("SPACE"); }
+.			{ printf("ERROR!"); }
 %%
 printf (str) = trace str $ return Nothing
