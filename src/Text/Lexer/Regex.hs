@@ -3,7 +3,7 @@ module Text.Lexer.Regex where
 import qualified Data.List as L
 import qualified Data.Map as M
 import qualified Data.Set.Monad as S
-import Data.Map ((!))
+import Data.Map ((!), (!?))
 import Data.List ((\\))
 import Text.ParserCombinators.Parsec hiding (State)
 
@@ -52,7 +52,10 @@ parseRegex symbolTable = regex where
     plus      = elemReg <* char '+' >>= return . \r -> Concat r (Closure r)
     question  = elemReg <* char '?' >>= return . Union Epsilon
     elemReg   = try userDef <|> try symbol <|> try epsilon <|> try any <|> try group <|> set
-    userDef   = betweenStrMany "{" "}" anyChar >>= return . (symbolTable !)
+    userDef   = betweenStrMany "{" "}" anyChar >>= return . (\key -> case symbolTable !? key of 
+        Just def -> def
+        Nothing  -> error $ "Key not found: " ++ key
+        )
     group     = betweenStrOne  "(" ")" regex
     any       = char '.' >> return (unionChars charset)
     epsilon   = char 'ε' >> return Epsilon

@@ -60,7 +60,7 @@ buildLexer (filename, text) = let
         userDefs,
         "lexer :: Lexer s a",
         "lexer = Lexer {",
-        "    dfa = " ++ show (DFA.build . minimize . eliminateDeads . mconcat $ regexDFA) ++ ",",
+        "    dfa = " ++ show (DFA.build {-. minimize-} . eliminateDeads . mconcat $ regexDFA) ++ ",",
         "    actions = fromList [" ++ tagActs ++ "]",
         "}",
         userCode]

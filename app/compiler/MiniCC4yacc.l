@@ -50,15 +50,15 @@ while			{ return WHILE; }
 /=			{ return DIV_ASSIGN; }
 %=			{ return MOD_ASSIGN; }
 &=			{ return AND_ASSIGN; }
-\^=			{ return XOR_ASSIGN;  }
-|=			{ return OR_ASSIGN;  }
+^=			{ return XOR_ASSIGN;  }
+\|=			{ return OR_ASSIGN;  }
 >>			{ return RIGHT_OP;  }
 <<			{ return LEFT_OP;  }
 \+\+			{ return INC_OP;  }
 --			{ return DEC_OP;  }
 ->			{ return PTR_OP;  }
 &&			{ return AND_OP;  }
-||			{ return OR_OP;  }
+\|\|			{ return OR_OP;  }
 <=			{ return LE_OP;  }
 >=			{ return GE_OP;  }
 ==			{ return EQ_OP;  }
@@ -69,8 +69,8 @@ while			{ return WHILE; }
 ,			{ return Char ,;  }
 :			{ return Char :;  }
 =			{ return Char =;  }
-(			{ return Char (;  }
-)			{ return Char );  }
+\(			{ return Char (;  }
+\)			{ return Char );  }
 \[		{ return Char [;  }
 \]		{ return Char ];  }
 \.			{ return Char .;  }
@@ -84,8 +84,8 @@ while			{ return WHILE; }
 %			{ return Char %;  }
 <			{ return Char <;  }
 >			{ return Char >;  }
-\^			{ return Char ^;  }
-|			{ return Char |;  }
+^			{ return Char ^;  }
+\|			{ return Char |;  }
 \?			{ return Char ?;  }
 {L}({L}|{D})*		{ return IDENTIFIER; }
 0[xX]{H}+{IS}?		{ return CONSTANT;  }
@@ -95,8 +95,8 @@ while			{ return WHILE; }
 {D}*\.{D}+{E}?{FS}?	{ return CONSTANT; }
 {D}+\.{D}*{E}?{FS}?	{ return CONSTANT; }
 0[xX]{H}+{P}{FS}?	{ return CONSTANT;  }
-0[xX]{H}*\.{H}+{P}{FS}?     { return CONSTANT;  }
-0[xX]{H}+\.{H}*{P}{FS}?     { return CONSTANT;  }
+0[xX]{H}*\.{H}+{P}{FS}?		{ return CONSTANT;  }
+0[xX]{H}+\.{H}*{P}{FS}?		{ return CONSTANT;  }
 
 [ \t\v\n\f]		{ return SPACE; }
 .			{ return ERROR; }
