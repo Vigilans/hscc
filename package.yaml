@@ -4,7 +4,7 @@ github:              "Vigilans/hscc"
 license:             MIT
 author:              "Vigilans"
 maintainer:          "vigilans@foxmail.com"
-copyright:           "2019 Vigilans"
+copyright:           "2019-2020 Vigilans"
 
 extra-source-files:
 - README.md
@@ -22,12 +22,18 @@ dependencies:
 - base >= 4.7 && < 5
 - containers
 - mtl
-- hspec
-- QuickCheck
 - parsec
 - multimap
 - array
 - set-monad
+- bytestring
+- string-transform
+- llvm-hs
+- llvm-hs-pure
+- recursion-schemes
+- composition
+- aeson
+- aeson-pretty
 
 default-extensions:
 - ViewPatterns
@@ -38,12 +44,13 @@ default-extensions:
 - LambdaCase
 - RecordWildCards
 - ScopedTypeVariables
+- OverloadedStrings
 
 library:
   source-dirs: src
 
 executables:
-  hscc-lex:
+  hslex:
     main:                Main.hs
     source-dirs:         app/lex
     ghc-options:
@@ -54,7 +61,7 @@ executables:
     dependencies:
     - hscc
 
-  hscc-yacc:
+  hsyacc:
     main:                Main.hs
     source-dirs:         app/yacc
     ghc-options:
@@ -65,9 +72,9 @@ executables:
     dependencies:
     - hscc
 
-  hscc-compiler:
+  hsclang:
     main:                Main.hs
-    source-dirs:         app/compiler
+    source-dirs:         app/clang
     ghc-options:
     - -threaded
     - -rtsopts

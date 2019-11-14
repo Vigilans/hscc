@@ -39,7 +39,7 @@ runLexer Lexer{..} input state = let
         input <- gets yyinput
         let (match : _, (token, rest)) = DFA.run dfa input
         modify $ \s -> s { yytoken = token, yyinput = rest }
-        actions ! (match) >>= \case
+        actions ! match >>= \case
             Nothing -> run
             Just a  -> return a
     in toInputState <$> runState run (fromInputState (input, state))

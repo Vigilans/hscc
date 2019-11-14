@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-12.24
+resolver: lts-14.16
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,6 +40,8 @@ packages:
 extra-deps:
 - git: git@github.com:giorgidze/set-monad.git
   commit: 697ddb75bddd7715512376967773cce7b54abb2e
+- llvm-hs-9.0.0
+- llvm-hs-pure-9.0.0
 
 
 # Override default flag values for local packages and extra-deps
