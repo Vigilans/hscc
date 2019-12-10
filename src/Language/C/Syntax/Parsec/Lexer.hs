@@ -67,3 +67,33 @@ turnSignedness :: Signedness -> Type -> Type
 turnSignedness s Unknown = Integer Int s
 turnSignedness s (Integer t _) = Integer t s
 turnSignedness s _ = error "Type is not of integer type"
+
+-- Operator
+
+primitiveOperator :: forall op st. (String -> op) -> [String] -> GenParser Char st op
+primitiveOperator parse ops = choice (run <$> ops) where
+    run op = do
+        reservedOp op
+        return $ parse op
+
+unaryOperator :: [String] -> GenParser Char st (Expression -> Expression)
+unaryOperator = primitiveOperator (Fix `compose2` parse) where
+    parse "+" = Unary Pos
+    parse "-" = Unary Neg
+
+binaryOperator :: [String] -> GenParser Char st (Expression -> Expression -> Expression)
+binaryOperator = primitiveOperator (Fix `compose3` parse) where
+    parse "+" = Binary Add
+    parse "-" = Binary Sub
+    parse "*" = Binary Mul
+    parse "/" = Binary Div
+    parse "%" = Binary Mod
+
+assignmentOperator :: [String] -> GenParser Char st (Expression -> Expression -> Expression)
+assignmentOperator = primitiveOperator (Fix `compose3` parse) where
+    parse "="  = Assign Nop
+    parse "+=" = Assign Add
+    parse "-=" = Assign Sub
+    parse "*=" = Assign Mul
+    parse "/=" = Assign Div
+    parse "%=" = Assign Mod
