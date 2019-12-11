@@ -97,3 +97,28 @@ assignmentOperator = primitiveOperator (Fix `compose3` parse) where
     parse "*=" = Assign Mul
     parse "/=" = Assign Div
     parse "%=" = Assign Mod
+
+-- Expression
+
+sizeofExpression :: GenParser Char st (Either Type Expression -> Expression)
+sizeofExpression = reserved "sizeof" $> (Fix `compose1` Sizeof)
+
+-- Statement
+
+ifStatement :: GenParser Char st (Expression -> Statement -> Statement -> Statement)
+ifStatement = reserved "if" $> If
+
+elseStatement :: GenParser Char st Statement -> GenParser Char st Statement
+elseStatement stmt = option EmptyStmt (reserved "else" >> stmt)
+
+whileStatement :: GenParser Char st (Expression -> Statement -> Statement)
+whileStatement = reserved "while" $> While False
+
+doWhileStatement :: GenParser Char st (Statement -> Expression -> Statement)
+doWhileStatement = reserved "do" $> flip (While True)
+
+forStatement :: GenParser Char st ((Statement, Statement, Statement) -> Statement -> Statement)
+forStatement = reserved "for" $> \(a, b, c) -> For a b c
+
+returnStatement :: GenParser Char st (Maybe Expression -> Statement)
+returnStatement = reserved "return" $> Return
