@@ -145,6 +145,64 @@ constant = Fix . uncurry Literal <$>
        <|> floatingConstant
        <|> stringConstant)
 
+-- <statement> ::= <leabeled-statement>
+--               | <expression-statement>
+--               | <compound-statement>
+--               | <selection-statement>
+--               | <iteration-statement>
+--               | <jump-statement>
+statement :: Parser Statement
+statement = compoundStatement
+        <|> expressionStatement
+        <|> declarationStatement
+        <|> labeledStatement
+        <|> selectionStatement
+        <|> iterationStatement
+        <|> jumpStatement
+
+-- <compound-statement> ::= { {<declaration>}* {<statement>}* }
+compoundStatement :: Parser Statement
+compoundStatement = Compound <$> braces (many statement)
+
+-- <labeled-statement> ::= <identifier> : <statement>
+--                       | case <constant-expression> : <statement>
+--                       | default : <statement>
+labeledStatement :: Parser Statement
+labeledStatement = identifier >> colon >> statement
+            --    <|> (reserved "case" >> constantExpression >> colon >> statement)
+            --    <|> (reserved "default" >> statement)
+
+-- <expression-statement> ::= {<expression>}? ;?
+expressionStatement :: Parser Statement
+expressionStatement = option EmptyStmt (ExprStmt <$> expression) <* optionMaybe semi
+
+-- <expression-statement> ::= <declaration>
+declarationStatement :: Parser Statement
+declarationStatement = LocalVar <$> declaration
+
+-- <selection-statement> ::= if ( <expression> ) <statement>
+--                         | if ( <expression> ) <statement> else <statement>
+--                         | switch ( <expression> ) <statement>
+selectionStatement :: Parser Statement
+selectionStatement = ifStatement <*> parens expression <*> statement <*> elseStatement statement
+
+-- <iteration-statement> ::= while ( <expression> ) <statement>
+--                         | do <statement> while ( <expression> ) ;
+--                         | for ( {<expression>}? ; {<expression>}? ; {<expression>}? ) <statement>
+iterationStatement :: Parser Statement
+iterationStatement = whileStatement <*> parens expression <*> statement
+                 <|> doWhileStatement <*> statement <* reserved "while" <*> parens expression
+                 <|> forStatement <*> parens ((,,) <$> expressionStatement <*> expressionStatement <*> expressionStatement) <*> statement
+
+-- <jump-statement> ::= goto <identifier> ;
+--                    | continue ;
+--                    | break ;
+--                    | return {<expression>}? ;
+jumpStatement :: Parser Statement
+jumpStatement = returnStatement <*> optionMaybe expression <* semi
+            <|> reserved "continue" $> Continue <* semi
+            <|> reserved "break" $> Break <* semi
+
 {- Utils -}
 
 unaryChainl1 :: (Stream s m t) => ParsecT s u m a -> ParsecT s u m (a -> a) -> ParsecT s u m a
