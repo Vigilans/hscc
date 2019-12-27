@@ -3,6 +3,7 @@ module Language.C.Syntax.Parsec.Parser where
 import Language.C.Syntax
 import Language.C.Syntax.Utils (TypeInfo, computeType)
 import Language.C.Syntax.Parsec.Lexer
+import Language.C.Semantic (constEval)
 import Data.Functor
 import Data.Functor.Foldable
 import Data.Bifunctor
@@ -11,6 +12,160 @@ import Control.Monad
 
 import Text.Parsec hiding (string)
 import Text.Parsec.String (Parser)
+
+-- <translation-unit> ::= {<external-declaration>}*
+compilationUnit :: Parser CompilationUnit
+compilationUnit = many externalDeclaration
+
+-- <external-declaration> ::= <function-definition>
+--                          | <declaration>
+externalDeclaration :: Parser ExternalDeclaration
+externalDeclaration = functionDefinition <|> convDeclaration <$> declaration where
+    convDeclaration _ = _
+
+-- <function-definition> ::= {<declaration-specifier>}* <declarator> {<declaration>}* <compound-statement>
+functionDefinition :: Parser ExternalDeclaration
+functionDefinition = do
+    specifiers             <- many declarationSpecifier
+    (modifier, identifier) <- declarator
+    _                      <- many declaration -- Don't know why there are declarations here
+    let Function retType args = computeType (Left modifier : specifiers)
+    FunctionDef retType identifier args <$> compoundStatement
+
+-- <declaration> ::= {<declaration-specifier>}+ {<init-declarator>} ;
+declaration :: Parser [Declaration]
+declaration = do
+    specifiers <- many1 declarationSpecifier
+    let genDeclaration ((modifier, identifier), init) = Declaration idType (Just identifier) init where
+            idType = computeType (Left modifier : specifiers)
+    map genDeclaration <$> commaSep initDeclarator
+
+-- <declaration-specifier> ::= <storage-class-specifier>
+--                           | <type-specifier>
+--                           | <type-qualifier>
+declarationSpecifier :: Parser TypeInfo
+declarationSpecifier = typeSpecifier
+                   <|> Left <$> typeQualifier
+                -- <|> storageClassSpecifier
+
+-- <type-specifier> ::= <primitive-type>
+--                    | <struct-or-union-specifier>
+--                    | <enum-specifier>
+--                    | <typedef-name>
+typeSpecifier :: Parser TypeInfo
+typeSpecifier = primitiveType
+            -- <|> structOrUnionSpecifier
+            -- <|> enumSpecifier
+            -- <|> typedefName
+
+-- <type-qualifier> ::= const
+--                    | volatile
+typeQualifier :: Parser (Type -> Type)
+typeQualifier = reserved "const" $> Const
+            -- <|> reserved "volatile" $> Volatile
+
+-- <pointer> ::= * {<type-qualifier>}* {<pointer>}?
+pointer :: Parser (Type -> Type)
+pointer = do
+    reservedOp "*"
+    qualifiers <- many typeQualifier
+    outerPtr   <- pointer
+    return $ foldr1 (.) (outerPtr : qualifiers ++ [Pointer])
+
+-- <init-declarator> ::= <declarator>
+--                     | <declarator> = <initializer>
+initDeclarator :: Parser ((Type -> Type, Identifier), Statement)
+initDeclarator = (,) <$> declarator <*> option EmptyStmt (reservedOp "=" >> initializer)
+
+-- <initializer> ::= <assignment-expression>
+--                 | { <initializer-list> }
+--                 | { <initializer-list> , }
+initializer :: Parser Statement
+initializer = ExprStmt <$> assignmentExpression
+          <|> braces initializerList
+
+-- <initializer-list> ::= <initializer>
+--                      | <initializer-list> , <initializer>
+initializerList :: Parser Statement
+initializerList = Compound <$> commaSep initializer
+
+-- <declarator> ::= {<pointer>}? <direct-declarator>
+declarator :: Parser (Type -> Type, Identifier)
+declarator = do
+    ptrSpecifier <- option id pointer
+    (specifier, identifier) <- directDeclarator
+    return (specifier . ptrSpecifier, identifier)
+
+-- <direct-declarator> ::= <identifier>
+--                       | ( <declarator> )
+--                       | <direct-declarator> [ {<constant-expression>}? ]
+--                       | <direct-declarator> ( <parameter-type-list> )
+--                       | <direct-declarator> ( {<identifier>}* ) -- obsolete-style declarator
+directDeclarator :: Parser (Type -> Type, Identifier)
+directDeclarator = base `unaryChainl1` rest where
+    base = (id, ) <$> identifier <|> parens declarator
+    rest = do
+        modifier <- arrayDeclModifier <|> functionDeclModifier
+        return $ first (modifier .) -- (modifier . specifier, identifier)
+
+-- <array-decl-modifier> := [<expression-type>]
+arrayDeclModifier :: Parser (Type -> Type)
+arrayDeclModifier = do
+    Fix (Literal _ (IntegerLit n)) <- constEval <$> brackets constantExpression
+    return $ flip Array n
+
+-- <function-decl-modifier> := (<parameter-type>)
+functionDeclModifier :: Parser (Type -> Type)
+functionDeclModifier = do
+    params <- braces parameterTypeList
+    return $ flip Function params
+
+-- <parameter-type-list> ::= <parameter-list>
+--                         | <parameter-list> , ... -- varArg
+parameterTypeList :: Parser [(Type, Maybe Identifier)]
+parameterTypeList = parameterList <* optional (comma <* reservedOp "...") -- ignore vararg
+
+-- <parameter-list> ::= <parameter-declaration>
+--                    | <parameter-list> , <parameter-declaration>
+parameterList :: Parser [(Type, Maybe Identifier)]
+parameterList = commaSep parameterDeclaration
+
+-- <parameter-declaration> ::= {<declaration-specifier>}+ <declarator>
+--                           | {<declaration-specifier>}+ <abstract-declarator>
+--                           | {<declaration-specifier>}+
+parameterDeclaration :: Parser (Type, Maybe Identifier)
+parameterDeclaration = do
+    specifiers <- many1 declarationSpecifier
+    (modifier, identifier) <- option (id, Nothing) (
+            second Just <$> declarator
+        <|> (, Nothing) <$> abstractDeclarator)
+    return (computeType (Left modifier : specifiers), identifier)
+
+-- <abstract-declarator> ::= <pointer>
+--                         | <pointer> <direct-abstract-declarator>
+--                         | <direct-abstract-declarator>
+abstractDeclarator :: Parser (Type -> Type)
+abstractDeclarator = do
+    specifier <- option id pointer
+    modifier  <- option id directAbstractDeclarator
+    return (modifier . specifier)
+
+-- <direct-abstract-declarator> ::=  ( <abstract-declarator> )
+--                                | {<direct-abstract-declarator>}? [ {<constant-expression>}? ]
+--                                | {<direct-abstract-declarator>}? ( {<parameter-type-list>}? )
+directAbstractDeclarator :: Parser (Type -> Type)
+directAbstractDeclarator = base `unaryChainl1` rest where
+    base = parens abstractDeclarator <|> arrayDeclModifier <|> functionDeclModifier
+    rest = do
+        modifier <- arrayDeclModifier <|> functionDeclModifier
+        return (modifier .)
+
+-- <type-name> ::= {<specifier-qualifier>}+ {<abstract-declarator>}?
+typeName :: Parser Type
+typeName = do
+    specifiers <- many1 (typeSpecifier <|> Left <$> typeQualifier)
+    modifier <- option id abstractDeclarator
+    return $ computeType (Left modifier : specifiers)
 
 -- <constant-expression> ::= <conditional-expression>
 constantExpression :: Parser Expression
