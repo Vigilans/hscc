@@ -32,6 +32,63 @@ type CodeGen = IRBuilderT ModGen
 codegen :: String -> CompilationUnit -> LLVM.Module
 codegen (toShortByteString -> filename) unit = buildModule filename _
 
+genExtDecl :: ExternalDeclaration -> ModuleBuilderT ProgramAnalysis LLVM.Operand
+-- Defined functions
+genExtDecl (FunctionDef retT name argDs body) = do
+    -- let args = [(genType t, genParamName n) | (t, n) <- argDs]
+    -- function (LLVM.mkName name) args (genType retT) $ \args -> do
+    --     genStatement body
+    _
+-- External functions
+genExtDecl (ExternFuncDecl retT name argTs) =
+    extern (LLVM.mkName name) (genType <$> argTs) (genType retT)
+-- Global variable
+-- External Variable
+
+genStatement :: Statement -> CodeGen () -- Statement in C does not have value
+genStatement = analyseStatement gen where
+    gen EmptyStmt = return ()
+    gen (ExprStmt expr)  = void $ genExpression expr -- discard value
+    gen (Compound stmts) = forM_ stmts genStatement
+    gen (Return Nothing) = retVoid
+    gen (Return (Just e)) = ret =<< (snd <$> genExpression e)
+-- gen (LocalVar (Declaration varType id maybeInit)) = do
+--     var <- alloca (genType varType) Nothing 4
+--     case maybeInit of
+--         ExprStmt init -> genExpression init
+--         Compound vals -> forM genExpression vals
+    gen (If ifExpr thenStmt EmptyStmt) = mdo
+        ifCond <- snd <$> genExpression ifExpr
+        condBr ifCond ifThen ifExit
+        ifThen <- block
+        genStatement thenStmt >> br ifExit
+        ifExit <- block `named` "if.exit"
+        return ()
+    gen (If ifExpr thenStmt elseStmt) = mdo
+        ifCond <- snd <$> genExpression ifExpr
+        condBr ifCond ifThen ifElse
+        ifThen <- block
+        genStatement thenStmt >> br ifExit
+        ifElse <- block `named` "if.else"
+        genStatement elseStmt >> br ifExit
+        ifExit <- block `named` "if.exit"
+        return ()
+    gen (While False guard loopStmt) = mdo -- while
+        whileBegin <- block `named` "while.begin"
+        whileGuard <- snd <$> genExpression guard
+        condBr whileGuard whileBody whileEnd
+        whileBody  <- block `named` "while.body"
+        genStatement loopStmt >> br whileBegin
+        whileEnd   <- block `named` "while.end"
+        return ()
+    gen (While True guard loopStmt) = mdo -- do while
+        whileBegin <- block `named` "while.begin"
+        genStatement loopStmt >> br whileBegin
+        whileGuard <- snd <$> genExpression guard
+        condBr whileGuard whileBegin whileEnd
+        whileEnd   <- block `named` "while.end"
+        return ()
+
 genExpression :: Expression -> CodeGen (Typed LLVM.Operand) -- Expression will return a typed value
 genExpression = analyseExpression gen where
     gen _ (Literal t lit)             = genLiteral t lit
