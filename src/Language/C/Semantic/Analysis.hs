@@ -1,3 +1,10 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-} -- For MonadState s (IRBuilderT m) instance
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE GADTs #-}
+
 module Language.C.Semantic.Analysis where
 
 import Language.C.Program
@@ -82,13 +89,15 @@ unaryFuncType Der t = (elemType t, t)
 binaryFuncType :: BinaryOp -> Type -> Type -> (Type, (Type, Type))
 binaryFuncType op a b = binaryOp op where
     binaryOp Com = (b, (a, b))
-    binaryOp Eq = (bool, (commonTy, commonTy))
-    binaryOp Ne = (bool, (commonTy, commonTy))
-    binaryOp Gt = (bool, (commonTy, commonTy))
-    binaryOp Ge = (bool, (commonTy, commonTy))
-    binaryOp Lt = (bool, (commonTy, commonTy))
-    binaryOp Le = (bool, (commonTy, commonTy))
-    binaryOp _  = (commonTy, (commonTy, commonTy))
+    binaryOp And = (bool, (bool, bool))
+    binaryOp Or  = (bool, (bool, bool))
+    binaryOp Eq  = (bool, (commonTy, commonTy))
+    binaryOp Ne  = (bool, (commonTy, commonTy))
+    binaryOp Gt  = (bool, (commonTy, commonTy))
+    binaryOp Ge  = (bool, (commonTy, commonTy))
+    binaryOp Lt  = (bool, (commonTy, commonTy))
+    binaryOp Le  = (bool, (commonTy, commonTy))
+    binaryOp _   = (commonTy, (commonTy, commonTy))
     commonTy = commonType a b
 
 {- State operation -}
