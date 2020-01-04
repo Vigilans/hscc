@@ -7,10 +7,10 @@ import Data.Functor.Foldable
 import Control.Monad.Identity
 import Control.Monad.Zip
 
-evalStatement :: Statement -> IdentityT ProgramAnalysis Statement
-evalStatement = analyseStatement eval where
-    eval (Compound stmts) = Compound <$> forM stmts evalStatement
-    -- eval (ExprStmt expr)  = ExprStmt <$> forM expr evalExpression
+-- evalStatement :: Statement -> IdentityT ProgramAnalysis Statement
+-- evalStatement = analyseStatement eval where
+--     eval (Compound stmts) = Compound <$> forM stmts evalStatement
+--     -- eval (ExprStmt expr)  = ExprStmt <$> forM expr evalExpression
 
 -- | Evaluate the expression down.
 -- The expression's AST will be modified to be suitable for codegen;

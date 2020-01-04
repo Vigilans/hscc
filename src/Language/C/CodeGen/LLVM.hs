@@ -7,6 +7,7 @@ import Language.C.Syntax
 import Language.C.Semantic
 import Data.Char
 import Data.Maybe
+import Data.Functor
 import Data.Bifunctor
 import Data.String.Transform
 
@@ -45,52 +46,54 @@ genExtDecl (ExternFuncDecl retT name argTs) =
 -- Global variable
 -- External Variable
 
-genStatement :: Statement -> CodeGen () -- Statement in C does not have value
-genStatement = analyseStatement gen where
-    gen EmptyStmt = return ()
-    gen (ExprStmt expr)  = void $ genExpression expr -- discard value
-    gen (Compound stmts) = forM_ stmts genStatement
-    gen (Return Nothing) = retVoid
-    gen (Return (Just e)) = ret =<< (snd <$> genExpression e)
--- gen (LocalVar (Declaration varType id maybeInit)) = do
---     var <- alloca (genType varType) Nothing 4
---     case maybeInit of
---         ExprStmt init -> genExpression init
---         Compound vals -> forM genExpression vals
-    gen (If ifExpr thenStmt EmptyStmt) = mdo
-        ifCond <- snd <$> genExpression ifExpr
+genStatement :: Statement -> CodeGen (Maybe LLVM.Operand) -- Statement in C does not necessarily have value
+genStatement = analyseStatement genExpression gen where
+    gen (Return expr) = (expr >>= maybe retVoid ret) $> Nothing
+    -- gen (LocalVar (Declaration varType id maybeInit)) = do
+    --     var <- alloca (genType varType) Nothing 4
+    --     case maybeInit of
+    --         ExprStmt init -> genExpression init
+    --         Compound vals -> forM genExpression vals
+    gen (If ifExpr thenStmt Nothing) = mdo
+        ifCond <- fromJust <$> ifExpr
         condBr ifCond ifThen ifExit
         ifThen <- block
-        genStatement thenStmt >> br ifExit
+        thenStmt >> br ifExit
         ifExit <- block `named` "if.exit"
-        return ()
-    gen (If ifExpr thenStmt elseStmt) = mdo
-        ifCond <- snd <$> genExpression ifExpr
+        return Nothing
+    gen (If ifExpr thenStmt (Just elseStmt)) = mdo
+        ifCond <- fromJust <$> ifExpr
         condBr ifCond ifThen ifElse
         ifThen <- block
-        genStatement thenStmt >> br ifExit
+        thenRt <- thenStmt
+        br ifExit
         ifElse <- block `named` "if.else"
-        genStatement elseStmt >> br ifExit
+        elseRt <- elseStmt
+        br ifExit
         ifExit <- block `named` "if.exit"
-        return ()
-    gen (While False guard loopStmt) = mdo -- while
+        case (thenRt, elseRt) of
+            (Just retThen, Just retElse) -> Just <$> phi [(retThen, ifThen), (retElse, ifElse)]
+            _ -> return Nothing -- Don't return a value if one block does not have value
+    gen (While False guard loopBody) = mdo -- while
         whileBegin <- block `named` "while.begin"
-        whileGuard <- snd <$> genExpression guard
+        whileGuard <- fromJust <$> guard
         condBr whileGuard whileBody whileEnd
         whileBody  <- block `named` "while.body"
-        genStatement loopStmt >> br whileBegin
+        loopResult <- loopBody
+        br whileBegin
         whileEnd   <- block `named` "while.end"
-        return ()
+        return loopResult
     gen (While True guard loopStmt) = mdo -- do while
         whileBegin <- block `named` "while.begin"
-        genStatement loopStmt >> br whileBegin
-        whileGuard <- snd <$> genExpression guard
+        loopResult <- loopStmt
+        br whileBegin
+        whileGuard <- fromJust <$> guard
         condBr whileGuard whileBegin whileEnd
         whileEnd   <- block `named` "while.end"
-        return ()
+        return loopResult
 
-genExpression :: Expression -> CodeGen (Typed LLVM.Operand) -- Expression will return a typed value
-genExpression = analyseExpression gen where
+genExpression :: Expression -> CodeGen LLVM.Operand -- Expression will return a typed value
+genExpression = fmap snd . analyseExpression gen where
     gen _ (Literal t lit)             = genLiteral t lit
     gen _ (Cast t' (t, e))            = genTypeCast t t' e
     gen _ (Unary  op (t, e))          = genUnaryOp  op t e

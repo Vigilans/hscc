@@ -54,13 +54,14 @@ type ProgramAnalysis = ProgramAnalysisT Identity
 -- analyseExtDecl (FunctionDef _ _ _ body) = _
 
 analyseStatement :: (MonadAnalysis m)
-                 => (Statement -> m a)
-                 -> (Statement -> m a)
-analyseStatement _ = _
-    -- s :: (Monad m, MonadAnalysis m) => StatementF Statement -> m ()
-    -- s = lift . analyse
-    -- analyse :: StatementF Statement -> ProgramAnalysis ()
-    -- analyse (Compound stmts) = _
+                 => (Expression -> m a)
+                 -> (StatementF (m (Maybe a)) -> m (Maybe a))
+                 -> (Statement -> m (Maybe a))
+analyseStatement algExpr alg = cata $ \case
+    EmptyStmt      -> return Nothing
+    ExprStmt expr  -> Just <$> algExpr expr
+    Compound stmts -> last <$> sequence stmts -- Like rust, use the last expression as return value
+    statement      -> alg statement
 
 analyseExpression :: (MonadAnalysis m)
                   => (Type -> ExpressionF (Typed a) -> m a) -- Expression type will be passed as first argument
@@ -113,7 +114,12 @@ newScope = liftAnalysisState $ modify $ \s -> s {
 cataM :: (Monad m, Traversable (Base t), Recursive t)
       => (Base t a -> m a) -> t -> m a
 cataM alg = c where
-  c = alg <=< traverse c . project
+  c = alg <=< traverse c <=< (return . project)
+
+anaM :: (Monad m, Traversable (Base t), Corecursive t)
+     => (a -> m (Base t a)) -> a -> m t
+anaM alg = a where
+  a = (return . embed) <=< traverse a <=< alg
 
 tzipWith :: (a -> b -> c) -> (a, a) -> (b, b) -> (c, c)
 tzipWith f (a1, a2) (b1, b2) = (f a1 b1, f a2 b2)
