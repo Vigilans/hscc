@@ -105,20 +105,20 @@ sizeofExpression = reserved "sizeof" $> (Fix `compose1` Sizeof)
 
 -- Statement
 
-ifStatement :: GenParser Char st (Expression -> Statement -> Statement -> Statement)
-ifStatement = reserved "if" $> If
+ifStatement :: GenParser Char st (Statement -> Statement -> Maybe Statement -> Statement)
+ifStatement = reserved "if" $> (Fix `compose3` If)
 
-elseStatement :: GenParser Char st Statement -> GenParser Char st Statement
-elseStatement stmt = option EmptyStmt (reserved "else" >> stmt)
+elseStatement :: GenParser Char st Statement -> GenParser Char st (Maybe Statement)
+elseStatement stmt = option Nothing (reserved "else" >> Just <$> stmt)
 
-whileStatement :: GenParser Char st (Expression -> Statement -> Statement)
-whileStatement = reserved "while" $> While False
+whileStatement :: GenParser Char st (Statement -> Statement -> Statement)
+whileStatement = reserved "while" $> (Fix `compose2` While False)
 
-doWhileStatement :: GenParser Char st (Statement -> Expression -> Statement)
-doWhileStatement = reserved "do" $> flip (While True)
+doWhileStatement :: GenParser Char st (Statement -> Statement -> Statement)
+doWhileStatement = reserved "do" $> (Fix `compose2` flip (While True))
 
 forStatement :: GenParser Char st ((Statement, Statement, Statement) -> Statement -> Statement)
-forStatement = reserved "for" $> \(a, b, c) -> For a b c
+forStatement = reserved "for" $> (Fix `compose2` \(a, b, c) -> For a b c)
 
-returnStatement :: GenParser Char st (Maybe Expression -> Statement)
-returnStatement = reserved "return" $> Return
+returnStatement :: GenParser Char st (Statement -> Statement)
+returnStatement = reserved "return" $> (Fix `compose1` Return)

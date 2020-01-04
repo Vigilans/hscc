@@ -29,18 +29,20 @@ data Declaration = Declaration
     Statement -- Optional initializer
     deriving (Eq, Show, Generic)
 
-data Statement
+data StatementF a
     = EmptyStmt
     | ExprStmt Expression -- Simple expression statement
-    | Compound [Statement] -- Block statement
     | LocalVar [Declaration] -- Local variable declaration in one line
-    | If Expression Statement Statement -- If cond then (else)
-    | While Bool Expression Statement -- While isDoWhile cond then
-    | For Statement Statement Statement Statement -- For init cond after body
-    | Return (Maybe Expression) -- Return expr
+    | Compound [a] -- Block statement
+    | If a a (Maybe a) -- If cond then (maybe else)
+    | While Bool a a -- While isDoWhile cond then
+    | For a a a a -- For init cond after body
+    | Return a -- Return (maybe expr)
     | Break -- Break loop
     | Continue -- Continue loop
-    deriving (Eq, Show, Generic)
+    deriving (Eq1, Show1, Functor, Foldable, Traversable)
+
+type Statement = Fix StatementF
 
 data ExpressionF a
     = Unary  UnaryOp  a
@@ -56,3 +58,12 @@ data ExpressionF a
     deriving (Eq1, Show1, Functor, Foldable, Traversable)
 
 type Expression = Fix ExpressionF
+
+emptyStmt :: Statement
+emptyStmt = Fix EmptyStmt
+
+exprStmt :: Expression -> Statement
+exprStmt = Fix . ExprStmt
+
+compound :: [Statement] -> Statement
+compound = Fix . Compound

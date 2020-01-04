@@ -75,19 +75,19 @@ pointer = do
 -- <init-declarator> ::= <declarator>
 --                     | <declarator> = <initializer>
 initDeclarator :: Parser ((Type -> Type, Identifier), Statement)
-initDeclarator = (,) <$> declarator <*> option EmptyStmt (reservedOp "=" >> initializer)
+initDeclarator = (,) <$> declarator <*> option emptyStmt (reservedOp "=" >> initializer)
 
 -- <initializer> ::= <assignment-expression>
 --                 | { <initializer-list> }
 --                 | { <initializer-list> , }
 initializer :: Parser Statement
-initializer = ExprStmt <$> assignmentExpression
+initializer = exprStmt <$> assignmentExpression
           <|> braces initializerList
 
 -- <initializer-list> ::= <initializer>
 --                      | <initializer-list> , <initializer>
 initializerList :: Parser Statement
-initializerList = Compound <$> commaSep initializer
+initializerList = compound <$> commaSep initializer
 
 -- <declarator> ::= {<pointer>}? <direct-declarator>
 declarator :: Parser (Type -> Type, Identifier)
@@ -317,7 +317,7 @@ statement = compoundStatement
 
 -- <compound-statement> ::= { {<declaration>}* {<statement>}* }
 compoundStatement :: Parser Statement
-compoundStatement = Compound <$> braces (many statement)
+compoundStatement = compound <$> braces (many statement)
 
 -- <labeled-statement> ::= <identifier> : <statement>
 --                       | case <constant-expression> : <statement>
@@ -329,24 +329,24 @@ labeledStatement = identifier >> colon >> statement
 
 -- <expression-statement> ::= {<expression>}? ;?
 expressionStatement :: Parser Statement
-expressionStatement = option EmptyStmt (ExprStmt <$> expression) <* optionMaybe semi
+expressionStatement = option emptyStmt (exprStmt <$> expression) <* optionMaybe semi
 
 -- <expression-statement> ::= <declaration>
 declarationStatement :: Parser Statement
-declarationStatement = LocalVar <$> declaration
+declarationStatement = Fix . LocalVar <$> declaration
 
 -- <selection-statement> ::= if ( <expression> ) <statement>
 --                         | if ( <expression> ) <statement> else <statement>
 --                         | switch ( <expression> ) <statement>
 selectionStatement :: Parser Statement
-selectionStatement = ifStatement <*> parens expression <*> statement <*> elseStatement statement
+selectionStatement = ifStatement <*> parens expressionStatement <*> statement <*> elseStatement statement
 
 -- <iteration-statement> ::= while ( <expression> ) <statement>
 --                         | do <statement> while ( <expression> ) ;
 --                         | for ( {<expression>}? ; {<expression>}? ; {<expression>}? ) <statement>
 iterationStatement :: Parser Statement
-iterationStatement = whileStatement <*> parens expression <*> statement
-                 <|> doWhileStatement <*> statement <* reserved "while" <*> parens expression
+iterationStatement = whileStatement <*> parens expressionStatement <*> statement
+                 <|> doWhileStatement <*> statement <* reserved "while" <*> parens expressionStatement
                  <|> forStatement <*> parens ((,,) <$> expressionStatement <*> expressionStatement <*> expressionStatement) <*> statement
 
 -- <jump-statement> ::= goto <identifier> ;
@@ -354,9 +354,9 @@ iterationStatement = whileStatement <*> parens expression <*> statement
 --                    | break ;
 --                    | return {<expression>}? ;
 jumpStatement :: Parser Statement
-jumpStatement = returnStatement <*> optionMaybe expression <* semi
-            <|> reserved "continue" $> Continue <* semi
-            <|> reserved "break" $> Break <* semi
+jumpStatement = returnStatement <*> expressionStatement <* semi
+            <|> reserved "continue" $> Fix Continue <* semi
+            <|> reserved "break" $> Fix Break <* semi
 
 {- Utils -}
 
